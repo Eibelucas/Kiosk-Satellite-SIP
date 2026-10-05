@@ -12,7 +12,7 @@ CONTACTS_FILE = Path(os.environ.get("CONTACTS_FILE", BASE_DIR / "contacts.json")
 
 app = Flask(__name__)
 
-NUMBER_RE = re.compile(r"^\+?[0-9]{3,20}$")
+NUMBER_RE = re.compile(r"^\+?[0-9*#]{3,20}$")
 
 
 def env(name, default=""):
@@ -67,8 +67,7 @@ def originate(number):
     with socket.create_connection((host, port), timeout=5) as sock:
         sock.settimeout(5)
         sock_file = sock.makefile("rb")
-        # AMI greeting
-        sock_file.readline()
+        sock_file.readline()  # AMI greeting
 
         login = send_ami_action(sock, sock_file, {
             "Action": "Login",
