@@ -1,0 +1,11 @@
+services:
+  kiosk-satellite-sip:
+    build: ./gateway
+    container_name: kiosk-satellite-sip
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    env_file:
+      - ./gateway/.env
+    volumes:
+      - ./gateway/contacts.json:/app/contacts.json:ro
