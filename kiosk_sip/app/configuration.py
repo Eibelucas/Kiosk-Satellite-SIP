@@ -412,10 +412,12 @@ include => from-kiosk-phone
         "pjsip.conf": pjsip, "extensions.conf": dial,
         "manager.conf": f"[general]\nenabled=yes\nwebenabled=no\nbindaddr=127.0.0.1\nport=5038\n\n[kioskphone]\nsecret={ini(ami_secret)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\nread=none\nwrite=originate\n",
         "rtp.conf": "[general]\nrtpstart=30000\nrtpend=30100\nicesupport=yes\n" + (f"stunaddr={account['stun_server']}\n" if account and account["stun_server"] else ""),
+        "resolver_unbound.conf": "[general]\nresolv=system\nhosts=system\n",
+        "stasis.conf": "[threadpool]\ninitial_size=5\n",
         "dnsmgr.conf": "[general]\nenable=yes\nrefreshinterval=90\n",
         "http.conf": "[general]\nenabled=no\n",
         "modules.conf": "[modules]\nautoload=no\n" + "".join(f"load={module}.so\n" for module in (
-            "res_pjproject", "res_sorcery_config", "res_sorcery_memory", "res_sorcery_astdb",
+            "res_resolver_unbound", "res_pjproject", "res_sorcery_config", "res_sorcery_memory", "res_sorcery_astdb",
             "res_pjsip", "res_pjsip_authenticator_digest", "res_pjsip_outbound_authenticator_digest",
             "res_pjsip_endpoint_identifier_user", "res_pjsip_endpoint_identifier_ip",
             "res_pjsip_registrar", "res_pjsip_outbound_registration", "res_pjsip_session",
