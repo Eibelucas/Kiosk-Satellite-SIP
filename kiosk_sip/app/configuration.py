@@ -242,6 +242,7 @@ def asterisk_files(cfg, ami_secret):
     pjsip = f"""[global]
 type=global
 user_agent=Kiosk-Satellite-SIP
+endpoint_identifier_order=username,ip
 
 [transport-udp]
 type=transport
