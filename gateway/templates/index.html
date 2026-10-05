@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Kiosk Satellite Telefon</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b0d10; --card:#171a20; --soft:#222630; --text:#f4f7fb; --muted:#9da7b4; --accent:#5dd39e; --danger:#ff5f67; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); }
+    .app { max-width:760px; margin:auto; padding:24px 20px 36px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:18px; }
+    h1 { font-size:30px; margin:0; }
+    .state { font-size:14px; color:var(--muted); }
+    .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; background:var(--card); padding:6px; border-radius:18px; margin-bottom:18px; }
+    .tab { border:0; background:transparent; color:var(--muted); padding:13px 16px; border-radius:14px; font-size:17px; }
+    .tab.active { background:var(--soft); color:var(--text); }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .contacts { display:grid; gap:10px; }
+    .contact { width:100%; display:flex; align-items:center; gap:14px; text-align:left; border:0; background:var(--card); color:var(--text); border-radius:18px; padding:14px 16px; }
+    .avatar { width:48px; height:48px; display:grid; place-items:center; border-radius:50%; background:var(--soft); font-size:21px; font-weight:700; }
+    .contact-main { flex:1; min-width:0; }
+    .contact-name { font-size:18px; font-weight:650; }
+    .contact-number { color:var(--muted); margin-top:2px; }
+    .phone-icon { font-size:24px; color:var(--accent); }
+    .number { min-height:66px; display:flex; align-items:center; justify-content:center; word-break:break-all; font-size:30px; letter-spacing:.5px; padding:8px; }
+    .dialpad { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; max-width:430px; margin:12px auto; }
+    .key { aspect-ratio:1.35; border:0; border-radius:22px; background:var(--card); color:var(--text); font-size:30px; }
+    .key:active,.contact:active { transform:scale(.98); background:var(--soft); }
+    .actions { display:flex; justify-content:center; align-items:center; gap:18px; margin-top:16px; }
+    .round { width:70px; height:70px; border-radius:50%; border:0; font-size:28px; }
+    .call { background:var(--accent); color:#07120d; }
+    .delete { background:var(--soft); color:var(--text); }
+    .message { min-height:24px; text-align:center; margin-top:14px; color:var(--muted); }
+    .message.error { color:var(--danger); }
+    .empty { background:var(--card); color:var(--muted); padding:24px; border-radius:18px; text-align:center; }
+    @media (min-width:700px) { .app { padding-top:36px; } .key { font-size:34px; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><h1>Telefon</h1><div class="state" id="state">Gateway wird geprüft …</div></div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-panel="contacts">Kontakte</button>
+    <button class="tab" data-panel="dialer">Wähltasten</button>
+  </div>
+
+  <section class="panel active" id="contacts">
+    <div class="contacts" id="contactList"><div class="empty">Kontakte werden geladen …</div></div>
+  </section>
+
+  <section class="panel" id="dialer">
+    <div class="number" id="number"></div>
+    <div class="dialpad">
+      <button class="key">1</button><button class="key">2</button><button class="key">3</button>
+      <button class="key">4</button><button class="key">5</button><button class="key">6</button>
+      <button class="key">7</button><button class="key">8</button><button class="key">9</button>
+      <button class="key">+</button><button class="key">0</button><button class="key">#</button>
+    </div>
+    <div class="actions">
+      <button class="round delete" id="delete" aria-label="Löschen">⌫</button>
+      <button class="round call" id="call" aria-label="Anrufen">☎</button>
+    </div>
+    <div class="message" id="message"></div>
+  </section>
+</div>
+<script>
+  const numberEl = document.getElementById('number');
+  const messageEl = document.getElementById('message');
+
+  document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === button));
+    document.querySelectorAll('.panel').forEach(x => x.classList.toggle('active', x.id === button.dataset.panel));
+  }));
+
+  document.querySelectorAll('.key').forEach(key => key.addEventListener('click', () => {
+    if (numberEl.textContent.length < 20) numberEl.textContent += key.textContent.trim();
+  }));
+  document.getElementById('delete').addEventListener('click', () => numberEl.textContent = numberEl.textContent.slice(0, -1));
+  document.getElementById('call').addEventListener('click', () => placeCall(numberEl.textContent));
+
+  async function placeCall(number) {
+    if (!number) return;
+    messageEl.className = 'message';
+    messageEl.textContent = 'Anruf wird aufgebaut …';
+    try {
+      const response = await fetch('/api/call', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({number})});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Anruf fehlgeschlagen');
+      messageEl.textContent = 'Asterisk hat den Anruf angenommen.';
+    } catch (error) {
+      messageEl.className = 'message error';
+      messageEl.textContent = error.message;
+    }
+  }
+
+  async function loadContacts() {
+    const list = document.getElementById('contactList');
+    try {
+      const contacts = await fetch('/api/contacts').then(r => r.json());
+      list.innerHTML = '';
+      if (!contacts.length) { list.innerHTML = '<div class="empty">Noch keine Kontakte in contacts.json.</div>'; return; }
+      contacts.sort((a,b) => Number(b.favorite)-Number(a.favorite) || a.name.localeCompare(b.name));
+      contacts.forEach(contact => {
+        const button = document.createElement('button');
+        button.className = 'contact';
+        button.innerHTML = `<span class="avatar">${contact.name.slice(0,1).toUpperCase()}</span><span class="contact-main"><div class="contact-name">${escapeHtml(contact.name)}</div><div class="contact-number">${escapeHtml(contact.number)}</div></span><span class="phone-icon">☎</span>`;
+        button.addEventListener('click', () => { numberEl.textContent = contact.number; document.querySelector('[data-panel="dialer"]').click(); placeCall(contact.number); });
+        list.appendChild(button);
+      });
+    } catch { list.innerHTML = '<div class="empty">Kontakte konnten nicht geladen werden.</div>'; }
+  }
+
+  async function loadStatus() {
+    try {
+      const data = await fetch('/api/status').then(r => r.json());
+      document.getElementById('state').textContent = data.ami_configured ? 'Asterisk verbunden · Audio-Bridge folgt' : 'Asterisk noch nicht konfiguriert';
+    } catch { document.getElementById('state').textContent = 'Gateway nicht erreichbar'; }
+  }
+
+  function escapeHtml(value) { const div=document.createElement('div'); div.textContent=value; return div.innerHTML; }
+  loadContacts(); loadStatus();
+</script>
+</body>
+</html>
