@@ -121,7 +121,7 @@ Nur ein SIP-Gerät gleichzeitig auf Nebenstelle 100 verwenden. Ein neu angemelde
 2. **Gateway URL** auf `http://NAS-IP:8088/` setzen. Bei geändertem Gateway-Port diesen verwenden.
 3. **Telefon öffnen** ausführen.
 4. Mit dem Kiosk-Benutzernamen und Kiosk-Passwort anmelden.
-5. Kontakte im HA-Assistenten hinterlegen, jeweils eine Zeile `Name;Telefonnummer`, oder direkt die Wähltasten verwenden.
+5. Kontakte im HA-Assistenten unter **Telefon → Kontakte und Kiosk-Karten** hinzufügen, oder direkt die Wähltasten verwenden.
 
 Die Home-Assistant-Ingress-URL gehört nicht in die Plugin-Einstellung. Verwende die normale LAN-URL inklusive abschließendem `/`.
 
@@ -173,3 +173,13 @@ Stand: 6. Oktober 2026. Der Build wird in CI geprüft. Eine echte Telekom-Regist
 - [easybell Asterisk/PJSIP](https://www.easybell.de/hilfe/telefon-konfiguration/ip-telefonanlagen-fuer-unsere-sip-trunks/antwort/asterisk-telefonanlagen/)
 - [FRITZ!Box IP-Telefon](https://fritz.com/apps/knowledge-base/FRITZ-Box-7412/42_IP-Telefon-an-FRITZ-Box-anmelden-und-einrichten/)
 - [Vodafone DSL-Zugangsdaten](https://www.vodafone.de/downloadarea/EGF_Kundenanleitung_DSL_Webanleitung_140126_DVW_26.pdf)
+
+## Kontakte als Kiosks anzeigen
+
+1. Im HA-Assistenten unter **Telefon** den Bereich **Kontakte und Kiosk-Karten** öffnen.
+2. **Kontakt hinzufügen** wählen. Anzeigename und erreichbare Telefonnummer eintragen.
+3. Für eine Raumkarte den Typ **Kiosk / Raumkarte** wählen; optional Raum und Favorit setzen.
+4. Speichern. Auf der Telefonseite erscheinen die Karten unter **Kontakte**; **Kiosks** filtert nur Kiosk-Karten. Die Suche findet Namen, Räume und Nummern.
+5. Eine Karte auswählen. Sie setzt die Zielnummer im Anrufpad. Erst **Anrufen** und die Rückruf-Bestätigung starten den Anruf.
+
+Es werden keine nativen Kiosk-Satellite-Intercom-Peers angelegt. Online-Status oder Präsenz werden nicht vorgetäuscht. Kiosk-Karten verwenden die von dir zugeordnete Telefonnummer und den normalen SIP-Rückruf auf Telefon 100. Noch keine internen Kiosk-Nebenstellen oder direkte Android-Audio-Bridge. Normale Telefonkontakte aus älteren Versionen bleiben erhalten.

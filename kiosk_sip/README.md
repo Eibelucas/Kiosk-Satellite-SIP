@@ -1,13 +1,15 @@
 # Kiosk Satellite SIP Gateway für HAOS
 
-Asterisk und Telefon-Gateway in einem Add-on, mit deutschem Telekom-Privatkunden-Onboarding.
+Asterisk und Telefon-Gateway in einem Add-on, mit deutschem Anbieter-Onboarding.
 
 - amd64, passend für HAOS direkt auf dem UGREEN DXP2800
 - Einrichtung über Home Assistant Ingress
-- Telekom-Registrierung, Nebenstelle 100 und lokaler Echo-Test 600
-- Anrufpad, Kontakte und Rückruf auf SIP-Telefon 100
+- Telekom, sipgate, easybell, FRITZ!Box und eigene SIP-Zugangsdaten
+- Mehrere Rufnummern, normale Hauptrufnummer und separate Durchsagen mit Absenderliste/PIN
+- SIP-Nebenstelle 100 und lokaler Echo-Test 600
+- Anrufpad, Telefonkontakte und Kiosk-/Raumkarten mit Suche/Favoriten
 - Optionaler LAN-Zugang mit eigenem Kiosk-Passwort
 
-**Noch keine Audio-Anbindung an Kiosk Satellite Intercom.** Zum Sprechen ist vorerst ein SIP-Telefon/Softphone nötig.
+**Noch keine Audio-Anbindung an Kiosk Satellite Intercom.** Zum Sprechen oder Empfangen einer Durchsage ist vorerst ein SIP-Telefon/Softphone bzw. SIP-Lautsprecher nötig. Kiosk-Karten sind die Kontaktanzeige im Anrufpad.
 
-Die vollständige Anleitung findest du im Tab **Dokumentation** bzw. in [DOCS.md](DOCS.md).
+Alle Schritte und Gegenproben stehen im Tab **Dokumentation** bzw. in [DOCS.md](DOCS.md).

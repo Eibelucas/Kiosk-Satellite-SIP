@@ -223,7 +223,12 @@ def validate(body, previous=None):
         name, number = contact.get("name", ""), contact.get("number", "")
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or not isinstance(number, str) or not DESTINATION.fullmatch(number):
             raise ValueError("Jeder Kontakt braucht einen Namen und eine gültige Telefonnummer.")
-        contacts.append({"name": name.strip(), "number": number, "favorite": bool(contact.get("favorite", False))})
+        kind, room, favorite = contact.get("kind", "phone"), contact.get("room", ""), contact.get("favorite", False)
+        if not isinstance(kind, str) or kind not in {"phone", "kiosk"} or not isinstance(room, str) or len(room) > 80 or type(favorite) is not bool:
+            raise ValueError("Kontakt: Typ Telefon/Kiosk, Raum und Favorit prüfen.")
+        secret_value(name.strip(), "Kontaktname")
+        secret_value(room.strip(), "Raum")
+        contacts.append({"name": name.strip(), "number": number, "favorite": favorite, "kind": kind, "room": room.strip()})
     cfg["contacts"] = contacts
     return cfg
 

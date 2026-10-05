@@ -10,13 +10,23 @@ Für **HAOS direkt auf einem UGREEN DXP2800** gibt es jetzt ein gemeinsames Add-
 4. **Weboberfläche öffnen** und die vier Einrichtungsschritte durchgehen.
 5. Anschließend das Add-on neu starten, ein SIP-Telefon als Nebenstelle **100** anmelden und im Kiosk-Plugin die angezeigte **Gateway URL** setzen.
 
-**[Vollständige Anleitung für HAOS und Telekom](kiosk_sip/DOCS.md)**. Diese Anleitung steht auch im Dokumentations-Tab des Add-ons.
+**[Vollständige Anleitung: Anbieter, mehrere Rufnummern und Durchsagen](kiosk_sip/DOCS.md)**. Sie steht auch im Dokumentations-Tab des Add-ons.
 
-**Aktueller Umfang:** Anrufpad und Kontakte öffnen, SIP-Telefon 100 zurückrufen und nach dem Annehmen über Telekom wählen. Eingehende Anrufe können auf Telefon 100 klingeln. Die direkte Audio-Verbindung zu **Kiosk Satellite Intercom ist noch nicht implementiert**; zum Sprechen ist derzeit ein SIP-Telefon oder Softphone erforderlich. Das Onboarding unterstützt Telekom Privatkunden, keinen Business-SIP-Trunk oder MagentaZuhause Regio.
+Für den Plugin-Manager und den HAOS-Add-on-Store dieselbe normale Repository-URL verwenden:
 
-Die Plugin-Release `v0.1.0` bleibt unverändert auf ihrem ursprünglichen Quellstand. Das HAOS-Add-on wird separat aus `main` installiert.
+```text
+https://github.com/Eibelucas/Kiosk-Satellite-SIP
+```
 
-## Standalone-Prototyp und Architektur
+**Aktueller Umfang:** Deutsches Onboarding für Telekom, sipgate, easybell, FRITZ!Box und manuelle Profile für Vodafone, 1&1, o2 bzw. andere registrierende SIP-Konten. Bis zu acht Rufnummern, eine normale Hauptrufnummer und separate Durchsage-Nummern mit erlaubten Absendern, optionaler PIN und begrenzter Dauer. Kontakte können als Kiosk-/Raumkarten mit Favoriten und Suche angezeigt werden.
+
+**Audio:** Normale Gespräche und Durchsagen benötigen derzeit ein SIP-Telefon/Softphone bzw. SIP-Lautsprecher als Nebenstelle **100**. Die direkte Audio-Verbindung zu **Kiosk Satellite Intercom ist noch nicht implementiert**. Eine Kiosk-Karte ist eine Darstellung eines Kontakts im Anrufpad, kein automatisch eingerichteter Intercom-Peer. Das Plugin allein nimmt keine SIP-Gespräche entgegen.
+
+**Updates:** Versionen im Format `26.10.1`, `26.10.2` usw.; Git-Tags mit `v` davor. Stabile Releases enthalten Plugin-ZIP, identisches Manifest und SHA-256-Datei. Die ZIP enthält genau `kiosk-satellite-plugin.json`, `plugin.jar` und `LICENSE`. Das HAOS-Add-on wird aus dem Repository gebaut und hat eine eigene Installation: Plugin und Add-on bei neuen Versionen jeweils aktualisieren. Gespeicherte Anschlussdaten bleiben in `/data` erhalten. Die historische Version `v0.1.0` bleibt verfügbar.
+
+**[Release-Schritte und Prüfungen](RELEASES.md)**
+
+## Historischer Standalone-Prototyp (für Entwickler)
 
 Unofficial SIP/telephone extension for [Kiosk Satellite](https://github.com/jxlarrea/kiosk-satellite).
 
@@ -25,7 +35,7 @@ The project is split into two parts:
 1. **Kiosk Satellite plugin** – adds a `Telefon öffnen` command and opens the configured phone UI inside Kiosk Satellite.
 2. **SIP gateway** – serves a touch-friendly dial pad/contact page and talks to Asterisk through AMI for outbound call setup.
 
-> Status: early development / v0.1.0. Outbound call setup is implemented as an Asterisk AMI originate request. The bidirectional RTP ↔ Kiosk Satellite Intercom audio bridge and incoming-call injection are the next milestone.
+> The following describes the original standalone `gateway/` prototype, not the current HAOS add-on. Outbound call setup is implemented as an Asterisk AMI originate request. The bidirectional RTP ↔ Kiosk Satellite Intercom audio bridge and incoming-call injection are the next milestone.
 
 ## Planned architecture
 

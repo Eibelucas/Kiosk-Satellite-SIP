@@ -1,3 +1,10 @@
+# 26.10.5
+
+- Kontakte als Kiosk-/Raumkarten mit Favoriten und Suche anzeigen.
+- Kontaktbearbeitung im HA-Assistenten; normale Kontakte aus älteren Versionen bleiben erhalten.
+- Karte auswählen bereitet den Anruf vor; kein automatisches Wählen.
+- Vollständige Anbieter-, Rufnummern-, Durchsage- und Update-Anleitung im Repository.
+
 # 26.10.4
 
 - Separate Durchsage-Rufnummer mit erlaubten Absendernummern.

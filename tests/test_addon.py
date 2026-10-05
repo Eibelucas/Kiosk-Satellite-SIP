@@ -351,3 +351,55 @@ def test_auto_answer_can_be_disabled():
     cfg=validate(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'])]))
     page=asterisk_files(cfg,'fake')['extensions.conf'].split('[incoming-page]')[1].split('[kiosk-auto-answer]')[0]
     assert 'Page(PJSIP/100,qsi,30)' in page and 'b(kiosk-auto-answer' not in page
+
+
+def test_kiosk_cards_are_contacts_and_do_not_originate_calls(instance):
+    settings,pbx,app=instance
+    settings.save({'contacts':[{'name':'Flur','number':'+4921611234500','kind':'kiosk','room':'Erdgeschoss','favorite':True},{'name':'Max','number':'+491701234567'}]})
+    client=app.test_client()
+    contacts=trusted(client,'GET','/api/contacts').json
+    assert contacts[0]['kind']=='kiosk' and contacts[0]['room']=='Erdgeschoss' and contacts[0]['favorite']
+    assert contacts[1]['kind']=='phone'
+    page=trusted(client,'GET','/').text
+    assert 'id="showKiosks"' in page and 'id="contactSearch"' in page
+    assert pbx.calls==[]
+
+
+@pytest.mark.parametrize('contact', [
+    {'name':'Bad','number':'123','kind':'script'}, {'name':'Bad','number':'123','room':[]},
+    {'name':'Bad','number':'123','favorite':'true'}, {'name':'Bad\nname','number':'123'},
+])
+def test_contact_card_schema_rejects_invalid_values(contact):
+    with pytest.raises(ValueError):validate(valid(contacts=[contact]))
+
+
+def test_real_ami_request_uses_selected_outbound_context(tmp_path, monkeypatch):
+    import socket
+    import threading
+    from pbx import Pbx
+    settings=Settings(tmp_path);settings.save(valid(lines=[line(),line('second','+4921611234568')]))
+    listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen(1);listener.settimeout(3)
+    real_connect=socket.create_connection
+    captured=[]
+    def handle():
+        with listener:
+            with listener.accept()[0] as peer:
+                peer.settimeout(3);peer.sendall(b'Asterisk Call Manager/9.0\r\n')
+                stream=peer.makefile('rb')
+                for _ in range(2):
+                    frame=[]
+                    while True:
+                        row=stream.readline()
+                        if row==b'\r\n':break
+                        assert row
+                        frame.append(row.decode().strip())
+                    captured.append(dict(row.split(': ',1) for row in frame))
+                    peer.sendall(b'Response: Success\r\nMessage: accepted\r\n\r\n')
+    thread=threading.Thread(target=handle);thread.start()
+    monkeypatch.setattr('pbx.socket.create_connection',lambda address,timeout:real_connect(listener.getsockname(),timeout))
+    response=Pbx(settings).originate('+491701234567','second')
+    thread.join(4);assert not thread.is_alive()
+    assert captured[0]['Action']=='Login' and captured[0]['Events']=='off'
+    assert captured[1]['Channel']=='PJSIP/100' and captured[1]['Context']=='from-out-second'
+    assert captured[1]['Exten']=='+491701234567' and captured[1]['Async']=='true'
+    assert settings.ami_secret not in json.dumps(response)
