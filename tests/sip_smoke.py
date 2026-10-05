@@ -32,18 +32,45 @@ def main():
     cfg['phone_number'] = '+4921611234567'
     cfg['lines'] = [{**cfg, 'id':'main', 'label':'Main', 'provider':'custom', 'enabled':True,
                      'incoming_mode':'normal', 'auth_mode':'password', 'auth_username':'fake',
-                     'auth_password':'fake-provider-secret', 'registrar':'127.0.0.1:15071',
-                     'domain':'127.0.0.1', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
+                     'auth_password':'fake-provider-secret', 'registrar':'fake.invalid',
+                     'domain':'fake.invalid', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
                      'from_user':'+4921611234567', 'stun_server':''},
                     {**cfg, 'id':'second', 'label':'Second', 'provider':'custom', 'enabled':True,
                      'incoming_mode':'reject', 'phone_number':'+4921611234568', 'auth_mode':'password', 'auth_username':'fake2',
-                     'auth_password':'fake-provider-secret2', 'registrar':'127.0.0.1:15071',
-                     'domain':'127.0.0.1', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
+                     'auth_password':'fake-provider-secret2', 'registrar':'fake.invalid',
+                     'domain':'fake.invalid', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
                      'from_user':'+4921611234568', 'stun_server':''}]
     cfg['lines'].append({**cfg['lines'][1], 'id':'page', 'phone_number':'+4921611234569',
         'client_user':'+4921611234569', 'contact_user':'+4921611234569', 'from_user':'+4921611234569',
         'incoming_mode':'announcement', 'announcement_callers':['+491701234567'],
         'announcement_auto_answer':True, 'announcement_max_seconds':30, 'announcement_pin':''})
+    # A local DNS server proves NAPTR/SRV resolution uses the configured
+    # resolver, rather than relying on an A-record at a fixed SIP port.
+    dns_queries=[]
+    dns=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    dns.bind(('127.0.0.1',15353));dns.settimeout(.5)
+    dns_stopped=threading.Event()
+    def dns_name(name):
+        return b''.join(bytes([len(label)])+label.encode() for label in name.split('.'))+b'\x00'
+    def serve_dns():
+        while not dns_stopped.is_set():
+            try:packet,peer=dns.recvfrom(4096)
+            except socket.timeout:continue
+            except OSError:return
+            labels=[];position=12
+            while packet[position]:
+                length=packet[position];position+=1;labels.append(packet[position:position+length].decode());position+=length
+            position+=1
+            kind,klass=struct.unpack('!HH',packet[position:position+4]);end=position+4
+            name='.'.join(labels);dns_queries.append((name,kind))
+            data=None
+            if kind==1:data=socket.inet_aton('127.0.0.1')
+            if kind==33 and name=='_sip._udp.fake.invalid':data=struct.pack('!HHH',0,1,15071)+dns_name('sip.fake.invalid')
+            answer=b'' if data is None else b'\xc0\x0c'+struct.pack('!HHIH',kind,1,60,len(data))+data
+            flags=0x8400|(struct.unpack('!H',packet[2:4])[0]&0x0100)
+            reply=packet[:2]+struct.pack('!HHHHH',flags,1,int(data is not None),0,0)+packet[12:end]+answer
+            dns.sendto(reply,peer)
+    threading.Thread(target=serve_dns,daemon=True).start()
     responses = queue.Queue()
     registrar = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     registrar.bind(('127.0.0.1',15071)); registrar.settimeout(.5)
@@ -67,6 +94,10 @@ def main():
     # provider registrations; disable qualification for this test phone only.
     files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0').replace('expiration=600','expiration=600\nmax_random_initial_delay=0')
     # Independent config/control socket/database; do not stop the running add-on.
+    files['resolver_unbound.conf']='[general]\nresolv=\nhosts=\nnameserver=127.0.0.1@15353\n'
+    # identify.match uses the platform resolver independently of the outbound
+    # resolver; keep the fake incoming source explicit for this isolated test.
+    files['pjsip.conf']=files['pjsip.conf'].replace('match=fake.invalid','match=127.0.0.1')
     files["logger.conf"] = "[general]\n[logfiles]\nconsole=verbose,notice,warning,error\n"
     files["manager.conf"] = "[general]\nenabled=no\n"
     for old, new in (("/etc/asterisk", str(base / "config")), ("/run/asterisk", str(base / "run")),
@@ -129,6 +160,7 @@ def main():
                 if result.count(' Registered')>=3: break
                 time.sleep(.2)
             assert result.count(' Registered')>=3,result
+            assert ('_sip._udp.fake.invalid',33) in dns_queries,dns_queries
             def invite(destination, expect_phone, expected_code=None, caller='+491701234567', page=False):
                 ident=uuid.uuid4().hex
                 sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
@@ -207,9 +239,9 @@ def main():
             invite('+4921611234569',True,page=True)
         dialplan = subprocess.check_output(["asterisk", "-C", astconf, "-rx", "dialplan show 600@from-phone"], text=True)
         assert "Echo()" in dialplan, dialplan
-        print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, three fake provider registrations, isolated incoming routing, announcement allowlist, Auto-Answer headers and one-way RTP audio and echo dialplan. No external call made.")
+        print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, local DNS SRV resolution, three fake provider registrations, isolated incoming routing, announcement allowlist, Auto-Answer headers and one-way RTP audio and echo dialplan. No external call made.")
     finally:
-        stopped.set(); registrar.close()
+        stopped.set(); registrar.close();dns_stopped.set();dns.close()
         process.terminate()
         try:
             process.wait(timeout=5)
