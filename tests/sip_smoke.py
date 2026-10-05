@@ -32,13 +32,13 @@ def main():
     cfg['phone_number'] = '+4921611234567'
     cfg['lines'] = [{**cfg, 'id':'main', 'label':'Main', 'provider':'custom', 'enabled':True,
                      'incoming_mode':'normal', 'auth_mode':'password', 'auth_username':'fake',
-                     'auth_password':'fake-provider-secret', 'registrar':'fake.invalid',
-                     'domain':'fake.invalid', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
+                     'auth_password':'fake-provider-secret', 'registrar':'sip-test.example.com',
+                     'domain':'sip-test.example.com', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
                      'from_user':'+4921611234567', 'stun_server':''},
                     {**cfg, 'id':'second', 'label':'Second', 'provider':'custom', 'enabled':True,
                      'incoming_mode':'reject', 'phone_number':'+4921611234568', 'auth_mode':'password', 'auth_username':'fake2',
-                     'auth_password':'fake-provider-secret2', 'registrar':'fake.invalid',
-                     'domain':'fake.invalid', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
+                     'auth_password':'fake-provider-secret2', 'registrar':'sip-test.example.com',
+                     'domain':'sip-test.example.com', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
                      'from_user':'+4921611234568', 'stun_server':''}]
     cfg['lines'].append({**cfg['lines'][1], 'id':'page', 'phone_number':'+4921611234569',
         'client_user':'+4921611234569', 'contact_user':'+4921611234569', 'from_user':'+4921611234569',
@@ -65,9 +65,9 @@ def main():
             name='.'.join(labels);dns_queries.append((name,kind))
             data=None
             if kind==1:data=socket.inet_aton('127.0.0.1')
-            if kind==33 and name=='_sip._udp.fake.invalid':data=struct.pack('!HHH',0,1,15071)+dns_name('sip.fake.invalid')
+            if kind==33 and name=='_sip._udp.sip-test.example.com':data=struct.pack('!HHH',0,1,15071)+dns_name('sip.example.com')
             answer=b'' if data is None else b'\xc0\x0c'+struct.pack('!HHIH',kind,1,60,len(data))+data
-            flags=0x8400|(struct.unpack('!H',packet[2:4])[0]&0x0100)
+            flags=0x8480|(struct.unpack('!H',packet[2:4])[0]&0x0100)
             reply=packet[:2]+struct.pack('!HHHHH',flags,1,int(data is not None),0,0)+packet[12:end]+answer
             dns.sendto(reply,peer)
     threading.Thread(target=serve_dns,daemon=True).start()
@@ -97,7 +97,7 @@ def main():
     files['resolver_unbound.conf']='[general]\nresolv=\nhosts=\nnameserver=127.0.0.1@15353\n'
     # identify.match uses the platform resolver independently of the outbound
     # resolver; keep the fake incoming source explicit for this isolated test.
-    files['pjsip.conf']=files['pjsip.conf'].replace('match=fake.invalid','match=127.0.0.1')
+    files['pjsip.conf']=files['pjsip.conf'].replace('match=sip-test.example.com','match=127.0.0.1')
     files["logger.conf"] = "[general]\n[logfiles]\nconsole=verbose,notice,warning,error\n"
     files["manager.conf"] = "[general]\nenabled=no\n"
     for old, new in (("/etc/asterisk", str(base / "config")), ("/run/asterisk", str(base / "run")),
@@ -120,6 +120,8 @@ def main():
         assert process.poll() is None, "Test Asterisk stopped"
         # SIP modules can finish loading just after the control socket opens.
         time.sleep(1)
+        resolver=subprocess.check_output(['asterisk','-C',astconf,'-rx','module show like res_resolver_unbound'],text=True)
+        assert 'Running' in resolver,resolver
         for function in ('CALLERID','PJSIP_HEADER','FILTER','GROUP_COUNT','TIMEOUT'):
             loaded=subprocess.check_output(['asterisk','-C',astconf,'-rx','core show function '+function],text=True)
             assert 'No function by that name' not in loaded and 'Syntax' in loaded,loaded
@@ -159,8 +161,8 @@ def main():
                 result=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show registrations'],text=True)
                 if result.count(' Registered')>=3: break
                 time.sleep(.2)
-            assert result.count(' Registered')>=3,result
-            assert ('_sip._udp.fake.invalid',33) in dns_queries,dns_queries
+            assert result.count(' Registered')>=3,(result,dns_queries)
+            assert ('_sip._udp.sip-test.example.com',33) in dns_queries,dns_queries
             def invite(destination, expect_phone, expected_code=None, caller='+491701234567', page=False):
                 ident=uuid.uuid4().hex
                 sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
