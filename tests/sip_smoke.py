@@ -145,7 +145,7 @@ def main():
                         break
                 else: raise AssertionError('No final response for test INVITE')
                 code=int(reply.split()[1])
-                assert code==(expected_code or (486 if expect_phone else 603)),(destination,reply)
+                assert code==(expected_code or (486 if expect_phone else 403)),(destination,reply)
             invite('+4921611234567',True)
             invite('+4921611234568',False)
             invite('+4921619999999',False,404)
