@@ -65,7 +65,7 @@ def main():
     files = asterisk_files(cfg, "fake-ami-secret")
     # The tiny fake phone has no background OPTIONS handler while waiting for
     # provider registrations; disable qualification for this test phone only.
-    files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0')
+    files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0').replace('expiration=600','expiration=600\nmax_random_initial_delay=0')
     # Independent config/control socket/database; do not stop the running add-on.
     files["logger.conf"] = "[general]\n[logfiles]\nconsole=verbose,notice,warning,error\n"
     files["manager.conf"] = "[general]\nenabled=no\n"
