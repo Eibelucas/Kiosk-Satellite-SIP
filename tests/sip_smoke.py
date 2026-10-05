@@ -175,9 +175,11 @@ def main():
                             # With the source now quiet, inject audio from the target.
                             # Muted Page participants must not send it back to the caller.
                             time.sleep(.25)
+                            source_rtp.settimeout(.001)
                             while True:
                                 try:source_rtp.recv(4096)
                                 except socket.timeout:break
+                            source_rtp.settimeout(.05)
                             reverse=[]
                             for seq in range(25):
                                 phone_rtp.sendto(struct.pack('!BBHII',0x80,8,seq,seq*160,4321)+bytes([0x80])*160,('127.0.0.1',phone_port))
