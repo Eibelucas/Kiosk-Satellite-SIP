@@ -419,7 +419,7 @@ include => from-kiosk-phone
             "res_pjsip", "res_pjsip_authenticator_digest", "res_pjsip_outbound_authenticator_digest",
             "res_pjsip_endpoint_identifier_user", "res_pjsip_endpoint_identifier_ip",
             "res_pjsip_registrar", "res_pjsip_outbound_registration", "res_pjsip_session",
-            "res_pjsip_sdp_rtp", "res_pjsip_pubsub", "res_pjsip_nat", "res_rtp_asterisk", "chan_pjsip",
+            "res_pjsip_sdp_rtp", "res_pjsip_pubsub", "res_pjsip_nat", "res_pjsip_caller_id", "res_pjsip_dtmf_info", "res_rtp_asterisk", "chan_pjsip",
             "codec_alaw", "codec_ulaw", "format_pcm", "bridge_simple", "bridge_native_rtp",
             "bridge_softmix", "pbx_config", "app_dial", "app_echo", "app_stack", "app_confbridge", "app_page", "app_read", "func_timeout", "func_groupcount", "res_pjsip_header_funcs", "func_callerid", "func_strings", "func_logic", "func_channel",
         )), 
