@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release tag to rebuild and publish assets for (leave empty for build only)'
+        required: false
+        default: ''
+        type: string
   release:
     types: [published]
 
@@ -15,6 +21,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -23,16 +31,29 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build plugin
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           VERSION="0.1.0"
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then VERSION="${GITHUB_REF_NAME#v}"; fi
+          if [ -n "$RELEASE_TAG" ]; then
+            VERSION="${RELEASE_TAG#v}"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
           python3 tools/build.py --android-platform 35 --version "$VERSION"
+      - name: Generate package checksums
+        run: |
+          cd dist
+          for package in *.zip; do
+            sha256sum "$package" > "$package.sha256"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: kiosk-satellite-sip-plugin
           path: dist/
       - name: Attach files to GitHub release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/kiosk-satellite-plugin.json --clobber
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: gh release upload "$RELEASE_TAG" dist/*.zip dist/*.zip.sha256 dist/kiosk-satellite-plugin.json --clobber
