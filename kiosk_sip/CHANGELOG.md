@@ -1,3 +1,10 @@
+# 26.10.2
+
+- Anbieter-Auswahl: Telekom, sipgate, easybell, FRITZ!Box und manuelle Profile für Vodafone, 1&1, o2 und eigene SIP-Konten.
+- Individuelle SIP-ID, Registrar, Domain, Proxy, Realm sowie UDP/TCP.
+- Gespeicherte Zugangsdaten werden bei Anbieterwechsel nicht übernommen.
+- Release-ZIP und SHA-256 werden vor dem Upload geprüft.
+
 # 26.10.1
 
 - HAOS-Add-on mit Asterisk und deutschem Telekom-Onboarding.

@@ -10,13 +10,28 @@ Für HAOS direkt auf einem UGREEN DXP2800 (amd64). Kein UGOS, keine zusätzliche
 4. **Kiosk Satellite SIP Gateway** öffnen und installieren. Das Image wird lokal gebaut; beim ersten Mal dauert das länger als ein Download.
 5. Starten, **Beim Booten starten** aktivieren und **Weboberfläche öffnen** wählen.
 
-Unter **Konfiguration** ist nur der Port der Kiosk-Telefonseite einstellbar (Standard `8088`). Die Telekom-Einrichtung erfolgt in der Weboberfläche. Nach Änderung des Ports das Add-on neu starten.
+Unter **Konfiguration** ist nur der Port der Kiosk-Telefonseite einstellbar (Standard `8088`). Die Anbieter-Einrichtung erfolgt in der Weboberfläche. Nach Änderung des Ports das Add-on neu starten.
 
 Falls das Add-on nicht erscheint: Store neu laden und sicherstellen, dass die URL ohne `/tree/…`, `/releases/…` oder Dateipfad eingetragen ist. Die App unterstützt derzeit ausschließlich amd64.
 
-## 2. Telekom-Onboarding
+## 2. Anbieter-Onboarding
 
-Der Assistent unterstützt **Telekom Privatkunden / MagentaZuhause**, nicht DeutschlandLAN SIP-Trunk oder MagentaZuhause Regio. Richte ihn zunächst an deinem eigenen Telekom-Anschluss ein.
+Wähle deinen Anbieter. Die Profile sind Konfigurationshilfen, keine Bestätigung eines Live-Tests deines Anschlusses.
+
+| Profil | Vorgabe / Zugang |
+| --- | --- |
+| Telekom Privatkunden | `tel.t-online.de`, Anschluss-Anmeldung oder Telefonie-Daten; kein DeutschlandLAN/Regio |
+| sipgate SIP-Gerät | `sipgate.de`, SIP-ID und Geräte-SIP-Passwort; kein trunking-Profil |
+| easybell VoIP | `voip.easybell.de`, SIP-Zugang aus my.easybell; Anmelde-ID standardmäßig `0049…` |
+| FRITZ!Box | Lokales IP-Telefon in der Box anlegen, dort Rufnummern zuweisen; Registrar/Domain `fritz.box` oder Router-IP |
+| Vodafone, 1&1, o2 | Manuelle Profile: aktuelle SIP-Zugangsdaten des Anschlusses einschließlich Registrar/Domain übernehmen |
+| Anderer Anbieter / PBX | Registrierendes SIP-Konto mit benutzerdefinierten Servern |
+
+SIP-Benutzername und Passwort sind vom Web-Login getrennt. Groß-/Kleinschreibung bleibt erhalten; nur Telekom verlangt hier Kleinschreibung. Bei Anbieterwechsel ist ein neues SIP-Passwort nötig. Noch keine TLS/SRTP-Unterstützung und keine reinen IP-authentifizierten Trunks. UDP/TCP betrifft den Anbieter; Telefon 100 verwendet UDP.
+
+Unter **Weitere SIP-Einstellungen** kannst du Client-User (Anmelde-ID), Contact-User (eingehende Ziel-ID), From-User, Realm, Proxy und STUN anpassen. Server als Hostname/IP, optional mit Port, niemals als `https://…` oder komplette SIP-URI eingeben. Bei Vodafone hängen diese Daten vom Anschluss/Netz ab.
+
+Für Telekom gilt folgende Einordnung:
 
 | Feld | Was du einträgst |
 | --- | --- |
@@ -109,3 +124,10 @@ Anschlusskonfiguration, Kontakte, Sitzungsschlüssel und AMI-Schlüssel liegen i
 - [Asterisk: NAT-Konfiguration](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-res_pjsip-to-work-through-NAT/)
 
 Stand: 6. Oktober 2026. Der Build wird in CI geprüft. Eine echte Telekom-Registrierung und Gespräche müssen mit deinen lokalen Anschlussdaten getestet werden.
+
+### Quellen für weitere Anbieter
+
+- [sipgate SIP-Geräte](https://help.sipgate.de/cloud-telefonanlage/erste-schritte/alles-fur-den-start-mit-sipgate/wie-konfiguriere-ich-mein-voip-telefon-mit-sipgate)
+- [easybell Asterisk/PJSIP](https://www.easybell.de/hilfe/telefon-konfiguration/ip-telefonanlagen-fuer-unsere-sip-trunks/antwort/asterisk-telefonanlagen/)
+- [FRITZ!Box IP-Telefon](https://fritz.com/apps/knowledge-base/FRITZ-Box-7412/42_IP-Telefon-an-FRITZ-Box-anmelden-und-einrichten/)
+- [Vodafone DSL-Zugangsdaten](https://www.vodafone.de/downloadarea/EGF_Kundenanleitung_DSL_Webanleitung_140126_DVW_26.pdf)

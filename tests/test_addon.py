@@ -188,3 +188,32 @@ def test_password_change_invalidates_lan_session(instance):
     assert client.get("/api/status").status_code == 200
     settings.save({"web_password": "a-different-fake-secret"})
     assert client.get("/api/status").status_code == 401
+
+@pytest.mark.parametrize('provider,server,client', [
+    ('telekom_private','tel.t-online.de','+4921611234567'),
+    ('sipgate','sipgate.de','FakeSipID'),
+    ('easybell','voip.easybell.de','004921611234567'),
+    ('fritzbox','fritz.box','FakeSipID'),
+    ('vodafone','sip.example.net','FakeSipID'), ('1und1','sip.example.net','FakeSipID'),
+    ('o2','sip.example.net','FakeSipID'), ('custom','sip.example.net','FakeSipID'),
+])
+def test_all_provider_profiles(provider, server, client):
+    cfg=validate(valid(provider=provider, auth_mode='password',auth_username='FakeSipID' if provider!='telekom_private' else 'fake@t-online.de',auth_password='fake-SIP-password',registrar=server))
+    from providers import resolve
+    account=resolve(cfg)
+    assert account['client_user']==client
+    files=asterisk_files(cfg,'fake-ami')
+    assert f'server_uri=sip:{server}' in files['pjsip.conf']
+    assert f'client_uri=sip:{client}@' in files['pjsip.conf']
+
+@pytest.mark.parametrize('field,value', [('registrar','https://evil/'),('outbound_proxy','sip:x;evil'),('domain','a\n[evil]'),('client_user','a@domain'),('transport','tls'),('realm','a;injection')])
+def test_provider_fields_reject_injection(field,value):
+    with pytest.raises(ValueError):
+        validate(valid(**{field:value}))
+
+def test_provider_change_requires_fresh_credentials():
+    previous=validate(valid(auth_mode='password',auth_username='fake@t-online.de',auth_password='fake-secret'))
+    with pytest.raises(ValueError):
+        validate({'provider':'sipgate','auth_username':'newID'},previous)
+    cfg=validate({'provider':'sipgate','auth_username':'newID','auth_password':'fresh-secret'},previous)
+    assert cfg['auth_password']=='fresh-secret'

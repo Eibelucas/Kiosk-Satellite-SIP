@@ -34,7 +34,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          VERSION="0.1.0"
+          VERSION="$(python3 -c 'import json; print(json.load(open("kiosk-satellite-plugin.json"))["version"])')"
           if [ -n "$RELEASE_TAG" ]; then
             VERSION="${RELEASE_TAG#v}"
           elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
@@ -47,6 +47,8 @@ jobs:
           for package in *.zip; do
             sha256sum "$package" > "$package.sha256"
           done
+      - name: Verify installable package format
+        run: python3 tools/verify_package.py
       - uses: actions/upload-artifact@v4
         with:
           name: kiosk-satellite-sip-plugin

@@ -2,7 +2,7 @@
 
 ## Auf deinem HAOS installieren
 
-Für **HAOS direkt auf einem UGREEN DXP2800** gibt es jetzt ein gemeinsames Add-on mit **Asterisk, Telefon-Gateway und deutschem Telekom-Onboarding**.
+Für **HAOS direkt auf einem UGREEN DXP2800** gibt es jetzt ein gemeinsames Add-on mit **Asterisk, Telefon-Gateway und deutschem Anbieter-Onboarding**.
 
 1. HA → Einstellungen → Apps/Add-ons → Store → Drei-Punkte-Menü → Repositories.
 2. `https://github.com/Eibelucas/Kiosk-Satellite-SIP` hinzufügen.

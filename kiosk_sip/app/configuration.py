@@ -7,6 +7,7 @@ import secrets
 from pathlib import Path
 
 from werkzeug.security import generate_password_hash
+from providers import ACCOUNT_DEFAULTS, PROVIDERS, resolve, validate_account
 
 DEFAULTS = {
     "enabled": False, "provider": "telekom_private", "phone_number": "",
@@ -14,10 +15,10 @@ DEFAULTS = {
     "auth_password": "", "listen_address": "127.0.0.1",
     "local_network": "192.168.2.0/24", "external_address": "",
     "sip_port": 5070, "phone_password": "", "lan_enabled": False,
-    "web_username": "kiosk", "web_password_hash": "", "contacts": [],
+    "web_username": "kiosk", "web_password_hash": "", "contacts": [], **ACCOUNT_DEFAULTS,
 }
 INPUT_FIELDS = (set(DEFAULTS) - {"web_password_hash"}) | {"web_password"}
-PHONE = re.compile(r"^\+49[1-9][0-9]{5,13}$")
+PHONE = re.compile(r"^\+[1-9][0-9]{6,14}$")
 DESTINATION = re.compile(r"^\+?[0-9*#]{3,20}$")
 
 
@@ -52,13 +53,18 @@ def validate(body, previous=None):
     for key in ("enabled", "lan_enabled"):
         if not isinstance(cfg[key], bool):
             raise ValueError("Ungültiger Schalter.")
-    if cfg["provider"] != "telekom_private":
-        raise ValueError("Dieser Assistent unterstützt Telekom Privatkunden, keinen DeutschlandLAN SIP-Trunk oder MagentaZuhause Regio.")
-    if cfg["auth_mode"] not in {"access", "password"}:
-        raise ValueError("Ungültige Telekom-Anmeldung.")
+    if not isinstance(cfg["provider"], str) or cfg["provider"] not in PROVIDERS:
+        raise ValueError("Unbekannter Anbieter.")
+    if previous and cfg["provider"] != previous["provider"]:
+        cfg["auth_password"] = ""
+        for key in ACCOUNT_DEFAULTS:
+            if key not in body:
+                cfg[key] = ACCOUNT_DEFAULTS[key]
+    if cfg["auth_mode"] not in {"access", "password"} or (cfg["auth_mode"] == "access" and cfg["provider"] != "telekom_private"):
+        raise ValueError("Dieser Anbieter benötigt SIP-Benutzername und SIP-Passwort.")
     number = cfg["phone_number"]
     if not isinstance(number, str) or not PHONE.fullmatch(number):
-        raise ValueError("Telekom-Rufnummer im Format +492611234567 eingeben, ohne Leerzeichen.")
+        raise ValueError("Rufnummer international, zum Beispiel +492611234567, ohne Leerzeichen eingeben.")
     try:
         address = ipaddress.IPv4Address(cfg["listen_address"])
         network = ipaddress.IPv4Network(cfg["local_network"], strict=False)
@@ -88,8 +94,9 @@ def validate(body, previous=None):
         cfg["auth_username"], cfg["auth_password"] = "anonymous@t-online.de", ""
     else:
         user = cfg["auth_username"]
-        if not isinstance(user, str) or not re.fullmatch(r"[a-z0-9._+@-]{3,120}", user) or not cfg["auth_password"]:
-            raise ValueError("Authentifizierungsname in Kleinschreibung und das zugehörige Passwort eintragen.")
+        if not isinstance(user, str) or not re.fullmatch(r"[A-Za-z0-9._+@~-]{1,120}", user) or not cfg["auth_password"] or (cfg["provider"] == "telekom_private" and user != user.lower()):
+            raise ValueError("SIP-Benutzername und Passwort eintragen. Telekom-Benutzernamen müssen kleingeschrieben sein.")
+    validate_account(cfg)
     secret_value(cfg["phone_password"], "SIP-Telefon-Passwort", 12)
     if not isinstance(cfg["web_username"], str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,40}", cfg["web_username"]):
         raise ValueError("Kiosk-Benutzername: nur Buchstaben, Ziffern, Unterstrich und Bindestrich.")
@@ -164,6 +171,7 @@ local_net=127.0.0.1/32
 """
     if cfg["external_address"]:
         pjsip += f"external_signaling_address={cfg['external_address']}\nexternal_media_address={cfg['external_address']}\n"
+    pjsip += pjsip[pjsip.index('[transport-udp]'):].replace('[transport-udp]', '[transport-tcp]').replace('protocol=udp', 'protocol=tcp')
     if cfg["phone_password"]:
         pjsip += f"""
 [100]
@@ -193,15 +201,16 @@ max_contacts=1
 remove_existing=yes
 qualify_frequency=30
 """
+    account = resolve(cfg) if cfg["enabled"] else None
     if cfg["enabled"]:
         auth = "outbound_auth=telekom-auth\n" if cfg["auth_mode"] == "password" else ""
         pjsip += f"""
 [telekom-registration]
 type=registration
-transport=transport-udp
-server_uri=sip:tel.t-online.de
-client_uri=sip:{cfg['phone_number']}@tel.t-online.de
-contact_user={cfg['phone_number']}
+transport=transport-{account['transport']}
+server_uri=sip:{account['registrar']}
+client_uri=sip:{account['client_user']}@{account['domain']}
+contact_user={account['contact_user']}
 retry_interval=60
 forbidden_retry_interval=300
 expiration=600
@@ -210,29 +219,33 @@ endpoint=telekom
 {auth}
 [telekom]
 type=endpoint
-transport=transport-udp
+transport=transport-{account['transport']}
 context=from-telekom
 disallow=all
 allow=alaw,ulaw
 aors=telekom-aor
-from_user={cfg['phone_number']}
-from_domain=tel.t-online.de
+from_user={account['from_user']}
+from_domain={account['domain']}
+send_pai=yes
 direct_media=no
 force_rport=yes
 rtp_symmetric=yes
 {auth}
 [telekom-aor]
 type=aor
-contact=sip:tel.t-online.de
+contact=sip:{account['registrar']}
 
 [telekom-identify]
 type=identify
 endpoint=telekom
-match=tel.t-online.de
+match={account['registrar'].split(':')[0]}
 srv_lookups=yes
 """
+        if account['outbound_proxy']:
+            proxy = f"outbound_proxy={ini('sip:' + account['outbound_proxy'] + ';lr')}\n"
+            pjsip = pjsip.replace('[telekom-registration]\n', '[telekom-registration]\n' + proxy).replace('[telekom]\n', '[telekom]\n' + proxy)
         if auth:
-            pjsip += f"\n[telekom-auth]\ntype=auth\nauth_type=userpass\nusername={ini(cfg['auth_username'])}\npassword={ini(cfg['auth_password'])}\nrealm=tel.t-online.de\n"
+            pjsip += f"\n[telekom-auth]\ntype=auth\nauth_type=userpass\nusername={ini(cfg['auth_username'])}\npassword={ini(cfg['auth_password'])}\nrealm={ini(account['realm']) or '*'}\n"
     dial = """[general]
 static=yes
 writeprotect=yes
@@ -253,7 +266,8 @@ include => from-kiosk-phone
     return {
         "pjsip.conf": pjsip, "extensions.conf": dial,
         "manager.conf": f"[general]\nenabled=yes\nwebenabled=no\nbindaddr=127.0.0.1\nport=5038\n\n[kioskphone]\nsecret={ini(ami_secret)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\nread=none\nwrite=originate\n",
-        "rtp.conf": "[general]\nrtpstart=30000\nrtpend=30100\nicesupport=yes\nstunaddr=stun.t-online.de:3478\n",
+        "rtp.conf": "[general]\nrtpstart=30000\nrtpend=30100\nicesupport=yes\n" + (f"stunaddr={account['stun_server']}\n" if account and account["stun_server"] else ""),
+        "dnsmgr.conf": "[general]\nenable=yes\nrefreshinterval=90\n",
         "http.conf": "[general]\nenabled=no\n",
         "modules.conf": "[modules]\nautoload=no\n" + "".join(f"load={module}.so\n" for module in (
             "res_pjproject", "res_sorcery_config", "res_sorcery_memory", "res_sorcery_astdb",

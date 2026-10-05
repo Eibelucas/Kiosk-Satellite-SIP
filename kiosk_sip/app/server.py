@@ -9,6 +9,7 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, ses
 from werkzeug.security import check_password_hash
 
 from configuration import DESTINATION
+from providers import PROVIDERS
 
 
 class IngressOnly:
@@ -131,7 +132,7 @@ def create_app(settings, pbx, gateway_port=8088):
 
     @app.get("/api/setup")
     def get_setup():
-        return jsonify(config=settings.public(), gateway_port=gateway_port,
+        return jsonify(config=settings.public(), providers=PROVIDERS, gateway_port=gateway_port,
                        gateway_url=f"http://{settings.value['listen_address']}:{gateway_port}/",
                        csrf=csrf_token())
 
@@ -167,7 +168,7 @@ def create_app(settings, pbx, gateway_port=8088):
             return jsonify(ok=False, error="Ungültige Telefonnummer."), 400
         state = pbx.status()
         if not settings.value["enabled"] or not state["telekom_registered"]:
-            return jsonify(ok=False, error="Telekom ist noch nicht registriert. Einrichtung und Status prüfen."), 409
+            return jsonify(ok=False, error="Der SIP-Anbieter ist noch nicht registriert. Einrichtung und Status prüfen."), 409
         if not state["phone_registered"]:
             return jsonify(ok=False, error="SIP-Telefon 100 anmelden. Der Kiosk selbst hat noch keine Audio-Bridge."), 409
         with call_lock:
