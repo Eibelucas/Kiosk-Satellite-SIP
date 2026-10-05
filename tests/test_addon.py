@@ -72,7 +72,7 @@ def test_repository_and_addon_metadata():
 @pytest.mark.parametrize("change", [
     {"phone_number": "021611234567"}, {"phone_number": "+49216\n[evil]"},
     {"listen_address": "0.0.0.0"}, {"listen_address": "8.8.8.8"},
-    {"listen_address": "192.168.3.20"}, {"sip_port": True}, {"sip_port": 8099},
+    {"local_network": "0.0.0.0/0"}, {"phone_password": " padded-secret "}, {"listen_address": "192.168.3.20"}, {"sip_port": True}, {"sip_port": 8099},
     {"phone_password": "short"}, {"phone_password": "hello\r\n[evil]"},
     {"provider": "business"}, {"auth_mode": "password", "auth_username": "TEST@example.com"},
     {"external_address": "192.168.2.1"}, {"lan_enabled": True, "web_password": ""},
@@ -103,7 +103,7 @@ def test_generated_pbx_isolated_ami_and_no_inbound_outbound_context(tmp_path):
     assert "bindaddr=127.0.0.1" in files["manager.conf"]
     assert "write=originate" in files["manager.conf"]
     assert "write=all" not in files["manager.conf"]
-    assert "pass\\;with\\\\punctuation" in files["pjsip.conf"]
+    assert "pass\\;with\\punctuation" in files["pjsip.conf"]
     assert "server_uri=sip:tel.t-online.de\n" in files["pjsip.conf"]
     assert "line=yes\nendpoint=telekom" in files["pjsip.conf"]
     inbound = files["extensions.conf"].split("[from-telekom]")[1]

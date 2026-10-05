@@ -37,6 +37,8 @@ def atomic_json(path, value):
 def secret_value(value, label, minimum=0):
     if not isinstance(value, str) or len(value) < minimum or len(value) > 256:
         raise ValueError(f"{label}: mindestens {minimum}, höchstens 256 Zeichen.")
+    if value != value.strip():
+        raise ValueError(f"{label}: keine Leerzeichen am Anfang oder Ende.")
     if any(ord(c) < 32 or ord(c) == 127 for c in value):
         raise ValueError(f"{label}: Steuerzeichen sind nicht erlaubt.")
     return value
@@ -62,7 +64,8 @@ def validate(body, previous=None):
         network = ipaddress.IPv4Network(cfg["local_network"], strict=False)
     except (ValueError, TypeError, ipaddress.AddressValueError) as exc:
         raise ValueError("NAS-Adresse und Heimnetz müssen gültige IPv4-Werte sein.") from exc
-    if not address.is_private or address.is_loopback or address.is_unspecified or address.is_multicast or address not in network:
+    private_ranges = [ipaddress.IPv4Network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+    if not any(network.subnet_of(n) for n in private_ranges) or address not in network or address in {network.network_address, network.broadcast_address}:
         raise ValueError("Die NAS-Adresse muss eine private IPv4-Adresse innerhalb deines Heimnetzes sein.")
     cfg["listen_address"], cfg["local_network"] = str(address), str(network)
     ext = cfg["external_address"]
@@ -143,7 +146,7 @@ class Settings:
 def ini(value):
     """Asterisk config values: keep escaped semicolons literal, reject line injection."""
     secret_value(str(value), "Konfigurationswert")
-    return str(value).replace("\\", "\\\\").replace(";", r"\;")
+    return str(value).replace(";", r"\;")
 
 
 def asterisk_files(cfg, ami_secret):
@@ -246,13 +249,21 @@ include => from-kiosk-phone
     if cfg["enabled"]:
         for pattern in ("_X.", "_+X.", "_*X.", "_#X."):
             dial += f"exten => {pattern},1,Set(CALLERID(num)={cfg['phone_number']})\n same => n,Dial(PJSIP/${{EXTEN}}@telekom,60)\n same => n,Hangup()\n"
-    dial += "\n[from-telekom]\nexten => _.,1,Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+    dial += "\n[from-telekom]\nexten => _+X.,1,Dial(PJSIP/100,45)\n same => n,Hangup()\nexten => _X.,1,Dial(PJSIP/100,45)\n same => n,Hangup()\n"
     return {
         "pjsip.conf": pjsip, "extensions.conf": dial,
         "manager.conf": f"[general]\nenabled=yes\nwebenabled=no\nbindaddr=127.0.0.1\nport=5038\n\n[kioskphone]\nsecret={ini(ami_secret)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\nread=none\nwrite=originate\n",
         "rtp.conf": "[general]\nrtpstart=30000\nrtpend=30100\nicesupport=yes\nstunaddr=stun.t-online.de:3478\n",
         "http.conf": "[general]\nenabled=no\n",
-        "modules.conf": "[modules]\nautoload=yes\nnoload=chan_sip.so\nnoload=chan_iax2.so\nnoload=res_http_websocket.so\nnoload=res_ari.so\nnoload=res_ari_events.so\nnoload=res_manager_devicestate.so\n",
+        "modules.conf": "[modules]\nautoload=no\n" + "".join(f"load={module}.so\n" for module in (
+            "res_pjproject", "res_sorcery_config", "res_sorcery_memory", "res_sorcery_astdb",
+            "res_pjsip", "res_pjsip_authenticator_digest", "res_pjsip_outbound_authenticator_digest",
+            "res_pjsip_endpoint_identifier_user", "res_pjsip_endpoint_identifier_ip",
+            "res_pjsip_registrar", "res_pjsip_outbound_registration", "res_pjsip_session",
+            "res_pjsip_sdp_rtp", "res_pjsip_pubsub", "res_rtp_asterisk", "chan_pjsip",
+            "codec_alaw", "codec_ulaw", "format_pcm", "bridge_simple", "bridge_native_rtp",
+            "bridge_softmix", "pbx_config", "app_dial", "app_echo", "app_stack", "func_pjsip_header",
+        )), 
         "logger.conf": "[general]\n[logfiles]\nconsole=warning,error\n",
         "asterisk.conf": "[directories]\nastetcdir => /etc/asterisk\nastmoddir => /usr/lib/asterisk/modules\nastvarlibdir => /var/lib/asterisk\nastdbdir => /data/asterisk\nastkeydir => /var/lib/asterisk/keys\nastdatadir => /var/lib/asterisk\nastagidir => /var/lib/asterisk/agi-bin\nastspooldir => /var/spool/asterisk\nastrundir => /run/asterisk\nastlogdir => /var/log/asterisk\n[options]\nrunuser=asterisk\nrungroup=asterisk\n[files]\nastctlpermissions=0660\nastctlowner=asterisk\nastctlgroup=asterisk\n",
     }

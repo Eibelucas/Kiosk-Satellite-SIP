@@ -1,3 +1,9 @@
+# 26.10.1
+
+- HAOS-Add-on mit Asterisk und deutschem Telekom-Onboarding.
+- Geschützte HA-Einrichtung, lokale Telefonseite und SIP-Nebenstelle 100.
+- Echte lokale SIP-Anmeldung mit Sonderzeichen im Passwort wird in CI geprüft.
+
 # Changelog
 
 ## 0.1.0
