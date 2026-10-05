@@ -80,6 +80,9 @@ def main():
         assert process.poll() is None, "Test Asterisk stopped"
         # SIP modules can finish loading just after the control socket opens.
         time.sleep(1)
+        for function in ('CALLERID','PJSIP_HEADER','FILTER'):
+            loaded=subprocess.check_output(['asterisk','-C',astconf,'-rx','core show function '+function],text=True)
+            assert 'No function by that name' not in loaded and 'Syntax' in loaded,loaded
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
             client.bind(("127.0.0.1", 0))
             client.settimeout(5)
