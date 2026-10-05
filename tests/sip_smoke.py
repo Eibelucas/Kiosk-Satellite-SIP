@@ -67,6 +67,7 @@ def main():
     # provider registrations; disable qualification for this test phone only.
     files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0')
     # Independent config/control socket/database; do not stop the running add-on.
+    files["logger.conf"] = "[general]\n[logfiles]\nconsole=verbose,notice,warning,error\n"
     files["manager.conf"] = "[general]\nenabled=no\n"
     for old, new in (("/etc/asterisk", str(base / "config")), ("/run/asterisk", str(base / "run")),
                      ("/data/asterisk", str(base / "db")), ("/var/log/asterisk", str(base / "log")),
@@ -78,7 +79,7 @@ def main():
         os.chown(path, 0, user.pw_gid)
         path.chmod(0o640)
     astconf = str(base / "config" / "asterisk.conf")
-    process = subprocess.Popen(["asterisk", "-f", "-C", astconf, "-U", "asterisk", "-G", "asterisk"])
+    process = subprocess.Popen(["asterisk", "-f", "-vvv", "-C", astconf, "-U", "asterisk", "-G", "asterisk"])
     try:
         for _ in range(50):
             result = subprocess.run(["asterisk", "-C", astconf, "-rx", "core show uptime"], capture_output=True, text=True)
