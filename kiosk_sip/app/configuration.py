@@ -46,7 +46,8 @@ def secret_value(value, label, minimum=0):
 
 
 ACCOUNT_FIELDS = {"enabled", "provider", "phone_number", "auth_mode", "auth_username", "auth_password"} | set(ACCOUNT_DEFAULTS)
-LINE_FIELDS = ACCOUNT_FIELDS | {"id", "label", "incoming_mode"}
+ANNOUNCEMENT_DEFAULTS = {"announcement_callers": [], "announcement_pin": "", "announcement_auto_answer": False, "announcement_max_seconds": 180}
+LINE_FIELDS = ACCOUNT_FIELDS | {"id", "label", "incoming_mode"} | set(ANNOUNCEMENT_DEFAULTS) | {"announcement_clear_pin"}
 
 
 def effective_lines(cfg):
@@ -57,32 +58,39 @@ def effective_lines(cfg):
     return []
 
 
+def number_aliases(number):
+    result = {number, number[1:], "00" + number[1:]}
+    if number.startswith("+49"):
+        result.add("0" + number[3:])
+    return sorted(result)
+
+
 def incoming_aliases(line):
     account = resolve(line)
     number = line["phone_number"]
-    aliases = {number, number[1:], "00" + number[1:], account["contact_user"], account["client_user"]}
-    if number.startswith("+49"):
-        aliases.add("0" + number[3:])
+    aliases = set(number_aliases(number)) | {account["contact_user"], account["client_user"]}
     return sorted(aliases)
 
 
 def validate_line(raw, previous=None):
     if not isinstance(raw, dict) or set(raw) - LINE_FIELDS:
         raise ValueError("Ungültiges Rufnummernkonto.")
-    cfg = {**{k: DEFAULTS[k] for k in ACCOUNT_FIELDS}, "id": "main", "label": "Rufnummer", "incoming_mode": "normal", **(previous or {}), **raw}
+    cfg = {**{k: DEFAULTS[k] for k in ACCOUNT_FIELDS}, "id": "main", "label": "Rufnummer", "incoming_mode": "normal", **ANNOUNCEMENT_DEFAULTS, **(previous or {}), **raw}
     if not isinstance(cfg["id"], str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", cfg["id"]):
         raise ValueError("Konto-ID: Kleinbuchstaben, Ziffern, Unterstrich oder Bindestrich, beginnend mit Buchstabe.")
     if not isinstance(cfg["label"], str) or not 1 <= len(cfg["label"].strip()) <= 80:
         raise ValueError("Jede Rufnummer benötigt einen Namen.")
     secret_value(cfg["label"], "Rufnummernname")
-    if type(cfg["enabled"]) is not bool or cfg["incoming_mode"] not in {"normal", "reject"}:
+    if type(cfg["enabled"]) is not bool or not isinstance(cfg["incoming_mode"], str) or cfg["incoming_mode"] not in {"normal", "reject", "announcement"}:
         raise ValueError("Ungültige Rufnummern-Rolle.")
     if not isinstance(cfg["provider"], str) or cfg["provider"] not in PROVIDERS:
         raise ValueError("Unbekannter Anbieter.")
-    if cfg["auth_mode"] not in {"access", "password"} or (cfg["auth_mode"] == "access" and cfg["provider"] != "telekom_private"):
+    if not isinstance(cfg["auth_mode"], str) or cfg["auth_mode"] not in {"access", "password"} or (cfg["auth_mode"] == "access" and cfg["provider"] != "telekom_private"):
         raise ValueError("Dieser Anbieter benötigt SIP-Benutzername und SIP-Passwort.")
     if not isinstance(cfg["phone_number"], str) or not PHONE.fullmatch(cfg["phone_number"]):
         raise ValueError("Rufnummer international, etwa +492611234567, ohne Leerzeichen eingeben.")
+    if any(not isinstance(cfg.get(key, ""), str) for key in ACCOUNT_DEFAULTS):
+        raise ValueError("SIP-Server und IDs müssen Text sein.")
     if not isinstance(cfg["auth_username"], str):
         raise ValueError("Ungültiger SIP-Benutzername.")
     changed = previous and (any(cfg[k] != previous.get(k) for k in ("provider", "auth_username")) or
@@ -100,6 +108,26 @@ def validate_line(raw, previous=None):
         user = cfg["auth_username"]
         if not isinstance(user, str) or not re.fullmatch(r"[A-Za-z0-9._+@~-]{1,120}", user) or not cfg["auth_password"] or (cfg["provider"] == "telekom_private" and user != user.lower()):
             raise ValueError("SIP-Benutzername und Passwort eintragen. Telekom-Benutzernamen müssen kleingeschrieben sein.")
+    if not isinstance(cfg["announcement_callers"], list) or len(cfg["announcement_callers"]) > 20:
+        raise ValueError("Höchstens 20 erlaubte Absendernummern für Durchsagen.")
+    callers = []
+    for caller in cfg["announcement_callers"]:
+        if not isinstance(caller, str) or not PHONE.fullmatch(caller):
+            raise ValueError("Durchsage-Absender international mit +Landesvorwahl eingeben.")
+        if caller not in callers:
+            callers.append(caller)
+    cfg["announcement_callers"] = callers
+    if cfg["incoming_mode"] == "announcement" and not callers:
+        raise ValueError("Für die Durchsage-Rufnummer mindestens eine erlaubte Absendernummer festlegen.")
+    pin = raw.get("announcement_pin", "")
+    if not isinstance(pin, str) or (pin and not re.fullmatch(r"[0-9]{6}", pin)):
+        raise ValueError("Optionale Durchsage-PIN muss genau sechs Ziffern enthalten.")
+    clear = cfg.pop("announcement_clear_pin", False)
+    if type(clear) is not bool or (clear and pin):
+        raise ValueError("PIN löschen oder eine neue PIN setzen, nicht beides gleichzeitig.")
+    cfg["announcement_pin"] = "" if clear else pin or (previous or {}).get("announcement_pin", "")
+    if type(cfg["announcement_auto_answer"]) is not bool or type(cfg["announcement_max_seconds"]) is not int or not 10 <= cfg["announcement_max_seconds"] <= 600:
+        raise ValueError("Durchsage: Auto-Answer-Schalter und Dauer zwischen 10 und 600 Sekunden prüfen.")
     validate_account(cfg)
     return cfg
 
@@ -129,7 +157,7 @@ def validate(body, previous=None):
         raise ValueError("Eine bis acht Rufnummern einrichten.")
     lines, ids, numbers, aliases = [], set(), set(), set()
     for raw in raw_lines:
-        line = validate_line(raw, prior_lines.get(raw.get("id")) if isinstance(raw, dict) else None)
+        line = validate_line(raw, prior_lines.get(raw.get("id")) if isinstance(raw, dict) and isinstance(raw.get("id"), str) else None)
         if line["id"] in ids or line["phone_number"] in numbers:
             raise ValueError("Rufnummern und Konto-IDs dürfen nicht doppelt vorkommen.")
         ids.add(line["id"]); numbers.add(line["phone_number"])
@@ -227,8 +255,8 @@ class Settings:
                 "auth_password_set": bool(self.value["auth_password"]),
                 "phone_password_set": bool(self.value["phone_password"]),
                 "web_password_set": bool(self.value["web_password_hash"]),
-                "lines": [{**{k: v for k, v in line.items() if k != "auth_password"},
-                           "auth_password_set": bool(line["auth_password"])} for line in effective_lines(self.value)]}
+                "lines": [{**{k: v for k, v in {**ANNOUNCEMENT_DEFAULTS, **line}.items() if k not in {"auth_password", "announcement_pin"}},
+                           "auth_password_set": bool(line["auth_password"]), "announcement_pin_set": bool(line.get("announcement_pin"))} for line in effective_lines(self.value)]}
 
 
 def ini(value):
@@ -363,8 +391,22 @@ include => from-kiosk-phone
         dial += f"\n[incoming-{line['id']}]\nexten => s,1,"
         if line["incoming_mode"] == "normal":
             dial += "Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+        elif line["incoming_mode"] == "announcement":
+            dial += "Set(KIOSK_CALLER=${FILTER(0-9+,${CALLERID(num)})})\n"
+            dial += ' same => n,GotoIf($["${CALLERID(num-pres):0:7}" != "allowed"]?denied)\n' 
+            dial += ' same => n,GotoIf($[${LEN(${CALLERID(num)})} != ${LEN(${KIOSK_CALLER})}]?denied)\n'
+            for caller in line["announcement_callers"]:
+                for alias in number_aliases(caller):
+                    dial += f' same => n,GotoIf($["${{KIOSK_CALLER}}" = "{alias}"]?authorized)\n'
+            dial += ' same => n,Goto(denied)\n same => n(authorized),Set(GROUP(kiosk-page)=active)\n same => n,GotoIf($[${GROUP_COUNT(active@kiosk-page)} > 1]?denied)\n'
+            dial += f' same => n,Set(TIMEOUT(absolute)={line["announcement_max_seconds"]})\n'
+            if line.get("announcement_pin"):
+                dial += f' same => n,Answer()\n same => n,Read(KIOSK_PIN,,6,,1,15)\n same => n,GotoIf($["${{KIOSK_PIN}}" != "{line["announcement_pin"]}"]?denied)\n'
+            predial = 'b(kiosk-auto-answer^s^1)' if line["announcement_auto_answer"] else ''
+            dial += f' same => n,Page(PJSIP/100,qsi{predial},30)\n same => n,Hangup()\n same => n(denied),Hangup(21)\n'
         else:
             dial += "Hangup(21)\n"
+    dial += "\n[kiosk-auto-answer]\nexten => s,1,Set(PJSIP_HEADER(add,Call-Info)=<sip:kiosk>\\;answer-after=0)\n same => n,Set(PJSIP_HEADER(add,Alert-Info)=<sip:kiosk>\\;info=alert-autoanswer)\n same => n,Return()\n"
     account = resolve(selected) if selected else None
     return {
         "pjsip.conf": pjsip, "extensions.conf": dial,
@@ -379,8 +421,9 @@ include => from-kiosk-phone
             "res_pjsip_registrar", "res_pjsip_outbound_registration", "res_pjsip_session",
             "res_pjsip_sdp_rtp", "res_pjsip_pubsub", "res_pjsip_nat", "res_rtp_asterisk", "chan_pjsip",
             "codec_alaw", "codec_ulaw", "format_pcm", "bridge_simple", "bridge_native_rtp",
-            "bridge_softmix", "pbx_config", "app_dial", "app_echo", "app_stack", "res_pjsip_header_funcs", "func_callerid", "func_strings", "func_logic", "func_channel",
+            "bridge_softmix", "pbx_config", "app_dial", "app_echo", "app_stack", "app_confbridge", "app_page", "app_read", "func_timeout", "func_groupcount", "res_pjsip_header_funcs", "func_callerid", "func_strings", "func_logic", "func_channel",
         )), 
+        "confbridge.conf": "[default_bridge]\ntype=bridge\ninternal_sample_rate=8000\nmixing_interval=20\n[default_user]\ntype=user\nquiet=yes\n",
         "cdr.conf": "[general]\nenable=no\n",
         "cel.conf": "[general]\nenable=no\n",
         "ccss.conf": "[general]\n",

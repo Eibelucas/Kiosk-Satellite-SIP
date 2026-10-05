@@ -68,6 +68,33 @@ Für die eingehende Zuordnung nutzt Asterisk die konkrete Ziel-ID: international
 
 Bei einer FRITZ!Box für jede Rolle ein eigenes IP-Telefon anlegen und in der Box **nur die zugehörige eingehende Nummer** zuweisen. Sonst kann die Box schon vor dem Add-on mehrere Nummern auf denselben SIP-Benutzer zusammenführen.
 
+## Eigene Rufnummer für Durchsagen
+
+So richtest du das gewünschte Beispiel ein, ohne die Hauptnummer umzuwidmen:
+
+| Konto | Rolle | Beispiel |
+| --- | --- | --- |
+| Hauptrufnummer | Normal auf Telefon 100 klingeln | `+4921611234567` (Beispieldaten ersetzen) |
+| Separate zweite Nummer | Durchsage von erlaubten Nummern | `+4921611234568` (Beispieldaten ersetzen) |
+| Erlaubter Absender für die zweite Nummer | Eigene vollständige Anrufernummer | `+491701234567` (Beispieldaten ersetzen) |
+| Standard ausgehend | Hauptrufnummer | Normale Gespräche verwenden die erste Nummer |
+
+1. Deine Hauptnummer als normales Konto lassen.
+2. Zweites SIP-Konto hinzufügen, dessen eigene Rufnummer und eigene passende Zugangsdaten eintragen.
+3. Bei **Eingehende Anrufe** die Rolle **Durchsage von erlaubten Nummern** wählen.
+4. Die tatsächlichen erlaubten Absender international mit `+` eintragen, eine pro Zeile. Kein Platzhalter, keine anonyme Nummer. Die nationale deutsche und `0049…`-Schreibweise werden im eingehenden Anruf ebenfalls berücksichtigt.
+5. Optional eine **PIN mit sechs Ziffern** setzen. Eine angezeigte Absendernummer kann gefälscht sein: Die Nummernliste ist keine sichere Authentifizierung. Die PIN ergänzt sie. Zum Entfernen ausdrücklich **Gespeicherte PIN entfernen** wählen; ein leeres Feld behält sie.
+6. **Auto-Answer auf Telefon/Lautsprecher 100 anfordern** bei Bedarf aktivieren. Am SIP-Gerät Auto-Answer **nur bei passenden SIP-Headern** konfigurieren, nicht pauschal bei jedem Anruf. Unterstützt werden `Call-Info: …;answer-after=0` und `Alert-Info: …;info=alert-autoanswer`; die konkrete Geräteunterstützung prüfen.
+7. Maximale Dauer setzen (10 bis 600 Sekunden, Standard 180), speichern und Status beider Nummern prüfen.
+8. Von der erlaubten Nummer die **zweite Nummer** anrufen. Bei PIN: Nach Verbindungsaufbau innerhalb von 15 Sekunden die sechs Ziffern eingeben, eventuell mit `#` abschließen. Es gibt kein gesprochenes PIN-Menü. Danach sprechen.
+9. Gegenprobe von einer fremden Nummer und mit unterdrückter Rufnummer: Der Anruf muss abgewiesen werden. Die Hauptnummer weiterhin separat auf normales Klingeln testen.
+
+Die Durchsage nutzt Asterisk Page mit stummem Zielmikrofon. Sie kann derzeit **SIP-Telefon bzw. SIP-Lautsprecher 100** erreichen. Das Kiosk-Plugin hat noch keine direkte Audio-Bridge zu Kiosk Satellite Intercom: Allein die Plugin-Installation lässt den Android-Kiosk deshalb noch keine SIP-Durchsage abspielen. Verwende vorerst ein passendes SIP-Gerät/Softphone. Ohne aktiviertes/unterstütztes Header-Auto-Answer klingelt dieses Ziel und muss angenommen werden.
+
+Besetzte Ziele werden übersprungen; Anrufe werden nicht erzwungen unterbrochen. Jeweils eine Durchsage läuft; weitere werden abgewiesen. Der Raum endet beim Auflegen des Absenders oder beim Dauerlimit. Es gibt keine Aufzeichnung und keine externe Weiterleitung an die erlaubten Absendernummern.
+
+Die Einstellungen hier ändern nicht die Nummernzuordnung im Router oder beim Anbieter. Bestehende Haustelefone dort behalten ihre bisherigen Zuordnungen; bei Bedarf die zweite Nummer dort von normalem Klingeln ausnehmen. Bei der FRITZ!Box pro Rolle ein eigenes IP-Telefonkonto und nur die zugehörige Nummer zuweisen.
+
 ## 3. SIP-Telefon anmelden und Audio testen
 
 Das installierte Kiosk-Plugin ist derzeit ein Launcher für die Telefonseite. **Es nimmt SIP-/RTP-Audio noch nicht über Kiosk Satellite Intercom entgegen.** Verwende für den ersten Test ein SIP-Telefon oder eine SIP-Softphone-App im selben Heimnetz.

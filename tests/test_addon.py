@@ -268,7 +268,7 @@ def test_nested_passwords_redacted_and_preserved_by_line_id(tmp_path):
     data=settings.public()
     assert 'one-secret' not in json.dumps(data) and 'two-secret' not in json.dumps(data)
     assert all('auth_password' not in item for item in data['lines'])
-    settings.save({'lines':[{**{k:v for k,v in l.items() if k!='auth_password_set'},'auth_password':''} for l in reversed(data['lines'])]})
+    settings.save({'lines':[{**{k:v for k,v in l.items() if k not in {'auth_password_set','announcement_pin_set'}},'auth_password':''} for l in reversed(data['lines'])]})
     assert settings.value['lines'][0]['auth_password']=='two-secret'
     assert settings.value['lines'][1]['auth_password']=='one-secret'
 
@@ -306,3 +306,48 @@ def test_callback_cannot_select_incoming_only_line(instance):
     client=app.test_client()
     assert trusted(client,'POST','/api/call',json={'number':'123','line':'second'},headers={'X-CSRF-Token':token(client)}).status_code==400
     assert pbx.calls==[]
+
+
+def test_announcement_number_is_separate_and_callers_are_gated():
+    cfg=validate(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'],announcement_auto_answer=True,announcement_pin='123456',announcement_max_seconds=90)]))
+    dial=asterisk_files(cfg,'fake')['extensions.conf']
+    normal=dial.split('[incoming-main]')[1].split('[incoming-page]')[0]
+    page=dial.split('[incoming-page]')[1].split('[kiosk-auto-answer]')[0]
+    assert 'Dial(PJSIP/100,45)' in normal and 'Page(' not in normal
+    assert 'GotoIf($["${KIOSK_CALLER}" = "+491701234567"]?authorized)' in page
+    assert 'Read(KIOSK_PIN,,6,,1,15)' in page and '"123456"' in page
+    assert 'TIMEOUT(absolute)=90' in page and 'GROUP_COUNT' in page
+    assert 'Page(PJSIP/100,qsib(kiosk-auto-answer^s^1),30)' in page
+    assert '@line-' not in page and '[from-out-page]' not in dial
+    assert 'Page(PJSIP/100,qsi' in page and 'qsid' not in page  # No duplex flag, target microphone muted.
+
+
+@pytest.mark.parametrize('changes', [
+    {'announcement_callers':[]},{'announcement_callers':['anonymous']},
+    {'announcement_callers':['+49170\nAction: Command']},{'announcement_callers':'all'},
+    {'announcement_pin':'12'},{'announcement_pin':'123456\n'},
+    {'announcement_auto_answer':'true'},{'announcement_max_seconds':0},
+    {'announcement_max_seconds':True},{'announcement_max_seconds':601},
+    {'announcement_clear_pin':'yes'},
+])
+def test_invalid_announcement_rules_rejected(changes):
+    with pytest.raises(ValueError):
+        validate(valid(lines=[line(),line('page','+4921611234568',**{'incoming_mode':'announcement','announcement_callers':['+491701234567'],**changes})]))
+
+
+def test_optional_pin_redaction_preservation_and_removal(tmp_path):
+    settings=Settings(tmp_path)
+    settings.save(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'],announcement_pin='654321')]))
+    assert '654321' not in json.dumps(settings.public())
+    public=settings.public()['lines']
+    body=[{k:v for k,v in l.items() if k not in {'auth_password_set','announcement_pin_set'}} for l in public]
+    settings.save({'lines':body})
+    assert settings.value['lines'][1]['announcement_pin']=='654321'
+    body[1]['announcement_clear_pin']=True;settings.save({'lines':body})
+    assert settings.value['lines'][1]['announcement_pin']==''
+
+
+def test_auto_answer_can_be_disabled():
+    cfg=validate(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'])]))
+    page=asterisk_files(cfg,'fake')['extensions.conf'].split('[incoming-page]')[1].split('[kiosk-auto-answer]')[0]
+    assert 'Page(PJSIP/100,qsi,30)' in page and 'b(kiosk-auto-answer' not in page

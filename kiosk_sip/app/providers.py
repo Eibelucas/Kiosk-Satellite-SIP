@@ -64,6 +64,8 @@ def resolve(cfg):
 
 
 def validate_account(cfg):
+    if any(not isinstance(cfg.get(key, ''), str) for key in ACCOUNT_DEFAULTS):
+        raise ValueError('SIP-Server und IDs müssen Text sein.')
     account = resolve(cfg)
     host(account['registrar'], 'Registrar', port=True)
     host(account['domain'], 'SIP-Domain')

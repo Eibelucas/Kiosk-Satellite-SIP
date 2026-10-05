@@ -1,3 +1,11 @@
+# 26.10.4
+
+- Separate Durchsage-Rufnummer mit erlaubten Absendernummern.
+- Einseitiger Audio-Pfad zum SIP-Telefon/Lautsprecher 100; Zielmikrofon bleibt stumm.
+- Optionaler Auto-Answer per SIP-Header, nur für die Durchsage-Rolle.
+- Optionale sechsstellige PIN, begrenzte Dauer und Schutz vor parallelen Durchsagen.
+- Normale Anrufe behalten normales Klingeln und normale Hauptrufnummer.
+
 # 26.10.3
 
 - Bis zu acht getrennte Rufnummernkonten mit eigenen Anbietern, Zugangsdaten und Status.

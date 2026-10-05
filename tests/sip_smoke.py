@@ -11,6 +11,7 @@ import time
 import uuid
 import threading
 import queue
+import struct
 from pathlib import Path
 
 sys.path.insert(0, "/app")
@@ -39,6 +40,10 @@ def main():
                      'auth_password':'fake-provider-secret2', 'registrar':'127.0.0.1:15071',
                      'domain':'127.0.0.1', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
                      'from_user':'+4921611234568', 'stun_server':''}]
+    cfg['lines'].append({**cfg['lines'][1], 'id':'page', 'phone_number':'+4921611234569',
+        'client_user':'+4921611234569', 'contact_user':'+4921611234569', 'from_user':'+4921611234569',
+        'incoming_mode':'announcement', 'announcement_callers':['+491701234567'],
+        'announcement_auto_answer':True, 'announcement_max_seconds':30, 'announcement_pin':''})
     responses = queue.Queue()
     registrar = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     registrar.bind(('127.0.0.1',15071)); registrar.settimeout(.5)
@@ -83,7 +88,7 @@ def main():
         assert process.poll() is None, "Test Asterisk stopped"
         # SIP modules can finish loading just after the control socket opens.
         time.sleep(1)
-        for function in ('CALLERID','PJSIP_HEADER','FILTER'):
+        for function in ('CALLERID','PJSIP_HEADER','FILTER','GROUP_COUNT','TIMEOUT'):
             loaded=subprocess.check_output(['asterisk','-C',astconf,'-rx','core show function '+function],text=True)
             assert 'No function by that name' not in loaded and 'Syntax' in loaded,loaded
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
@@ -120,13 +125,13 @@ def main():
             # by their called number; the secondary account is rejected, never dialed out.
             for _ in range(40):
                 result=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show registrations'],text=True)
-                if result.count(' Registered')>=2: break
+                if result.count(' Registered')>=3: break
                 time.sleep(.2)
-            assert result.count(' Registered')>=2,result
-            def invite(destination, expect_phone, expected_code=None):
+            assert result.count(' Registered')>=3,result
+            def invite(destination, expect_phone, expected_code=None, caller='+491701234567', page=False):
                 ident=uuid.uuid4().hex
                 sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
-                request=(f'INVITE sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{ident};rport\r\nMax-Forwards: 70\r\nFrom: <sip:+491701234567@127.0.0.1>;tag={ident}\r\nTo: <sip:{destination}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: 1 INVITE\r\nContact: <sip:fake@127.0.0.1:15071>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}')
+                request=(f'INVITE sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{ident};rport\r\nMax-Forwards: 70\r\nFrom: <sip:{caller}@127.0.0.1>;tag={ident}\r\nTo: <sip:{destination}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: 1 INVITE\r\nContact: <sip:fake@127.0.0.1:15071>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}')
                 registrar.sendto(request.encode(),('127.0.0.1',15070))
                 if expect_phone:
                     while True:
@@ -136,8 +141,53 @@ def main():
                         if phone_msg.startswith('OPTIONS '):
                             client.sendto(('SIP/2.0 200 OK\r\n'+'\r\n'.join(sip_headers(phone_msg))+'\r\nContent-Length: 0\r\n\r\n').encode(),('127.0.0.1',15070))
                     assert 'sip:100@' in phone_msg.splitlines()[0],phone_msg
-                    assert 'answer-after=0' not in phone_msg,phone_msg
-                    client.sendto(('SIP/2.0 486 Busy Here\r\n'+'\r\n'.join(sip_headers(phone_msg))+'\r\nContent-Length: 0\r\n\r\n').encode(),('127.0.0.1',15070))
+                    assert ('answer-after=0' in phone_msg)==page,phone_msg
+                    if page:
+                        assert 'info=alert-autoanswer' in phone_msg,phone_msg
+                        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as source_rtp, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as phone_rtp:
+                            source_rtp.bind(('127.0.0.1',41000)); source_rtp.settimeout(.1)
+                            phone_rtp.bind(('127.0.0.1',42000)); phone_rtp.settimeout(.1)
+                            phone_sdp=sdp.replace('41000','42000')
+                            rows=[row+';tag=fakephone' if row.startswith('To:') else row for row in sip_headers(phone_msg)]
+                            client.sendto(('SIP/2.0 200 OK\r\n'+'\r\n'.join(rows)+f'\r\nContact: <sip:100@127.0.0.1:{local_port}>\r\nContent-Type: application/sdp\r\nContent-Length: {len(phone_sdp)}\r\n\r\n{phone_sdp}').encode(),('127.0.0.1',15070))
+                            deadline=time.monotonic()+5
+                            while time.monotonic()<deadline:
+                                reply=responses.get(timeout=5)
+                                if f'Call-ID: {ident}' in reply and reply.startswith('SIP/2.0 200'):break
+                            else:raise AssertionError('Page did not answer source')
+                            source_port=int(re.search(r'm=audio (\d+)',reply).group(1))
+                            phone_port=int(re.search(r'm=audio (\d+)',phone_msg).group(1))
+                            dialog_rows=sip_headers(reply)
+                            def dialog(method,seq):
+                                rows=[row for row in dialog_rows if not row.startswith(('Via:','CSeq:'))]
+                                wire=f'{method} sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{uuid.uuid4().hex};rport\r\n'+'\r\n'.join(rows)+f'\r\nCSeq: {seq} {method}\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n'
+                                registrar.sendto(wire.encode(),('127.0.0.1',15070))
+                            dialog('ACK',1)
+                            received=[]
+                            for seq in range(35):
+                                payload=bytes([0x80 if seq%2 else 0x00])*160
+                                source_rtp.sendto(struct.pack('!BBHII',0x80,8,seq,seq*160,1234)+payload,('127.0.0.1',source_port))
+                                time.sleep(.02)
+                                try:received.append(phone_rtp.recv(4096)[12:])
+                                except socket.timeout:pass
+                            assert any(p and any(v not in (0xD5,0x55) for v in p) for p in received),'No announcement audio reached fake speaker'
+                            # With the source now quiet, inject audio from the target.
+                            # Muted Page participants must not send it back to the caller.
+                            time.sleep(.25)
+                            while True:
+                                try:source_rtp.recv(4096)
+                                except socket.timeout:break
+                            reverse=[]
+                            for seq in range(25):
+                                phone_rtp.sendto(struct.pack('!BBHII',0x80,8,seq,seq*160,4321)+bytes([0x80])*160,('127.0.0.1',phone_port))
+                                time.sleep(.02)
+                                try:reverse.append(source_rtp.recv(4096)[12:])
+                                except socket.timeout:pass
+                            assert all(all(v in (0xD5,0x55) for v in p) for p in reverse),'Target microphone leaked into announcement'
+                            dialog('BYE',2)
+                        return
+                    rows=[row+';tag=fakephone' if row.startswith('To:') else row for row in sip_headers(phone_msg)]
+                    client.sendto(('SIP/2.0 486 Busy Here\r\n'+'\r\n'.join(rows)+'\r\nContent-Length: 0\r\n\r\n').encode(),('127.0.0.1',15070))
                 deadline=time.monotonic()+6
                 while time.monotonic()<deadline:
                     reply=responses.get(timeout=6)
@@ -149,9 +199,12 @@ def main():
             invite('+4921611234567',True)
             invite('+4921611234568',False)
             invite('+4921619999999',False,404)
+            invite('+4921611234569',False,403,caller='+491709999999')
+            invite('+4921611234569',False,403,caller='anonymous')
+            invite('+4921611234569',True,page=True)
         dialplan = subprocess.check_output(["asterisk", "-C", astconf, "-rx", "dialplan show 600@from-phone"], text=True)
         assert "Echo()" in dialplan, dialplan
-        print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, two fake provider registrations, normal/secondary incoming routing and echo dialplan. No external call made.")
+        print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, three fake provider registrations, isolated incoming routing, announcement allowlist, Auto-Answer headers and one-way RTP audio and echo dialplan. No external call made.")
     finally:
         stopped.set(); registrar.close()
         process.terminate()
