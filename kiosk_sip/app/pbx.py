@@ -8,7 +8,7 @@ import time
 import uuid
 from pathlib import Path
 
-from configuration import asterisk_files
+from configuration import asterisk_files, effective_lines, DESTINATION
 
 
 class Pbx:
@@ -68,15 +68,18 @@ class Pbx:
         registrations = self.cli("pjsip show registrations") if running else ""
         phone = self.cli("pjsip show contacts") if running else ""
         # Do not send raw CLI output, account names or secrets to browsers.
-        registered = any("telekom-registration/" in line and " Registered" in line for line in registrations.splitlines())
-        phone_ready = any("100/sip:" in line and (" Avail" in line or " NonQual" in line) for line in phone.splitlines())
-        state = "deaktiviert"
-        if self.settings.value["enabled"]:
-            state = "registriert" if registered else "wartet"
-            if "Rejected" in registrations:
-                state = "abgelehnt"
-        return {"asterisk_running": running, "telekom_registered": registered,
-                "registration_state": state, "phone_registered": phone_ready,
+        states = []
+        for line in effective_lines(self.settings.value):
+            row = next((row for row in registrations.splitlines() if f"line-{line['id']}-registration/" in row), "")
+            registered = " Registered" in row
+            state = "deaktiviert" if not line["enabled"] else "registriert" if registered else "abgelehnt" if "Rejected" in row else "wartet"
+            states.append({"id": line["id"], "label": line["label"], "phone_number": line["phone_number"],
+                           "enabled": line["enabled"], "incoming_mode": line["incoming_mode"], "registered": registered, "state": state})
+        selected = next((line for line in states if line["id"] == self.settings.value.get("outbound_line", "main")), {})
+        phone_ready = any("100/sip:" in row and (" Avail" in row or " NonQual" in row) for row in phone.splitlines())
+        return {"asterisk_running": running, "provider_registered": selected.get("registered", False),
+                "telekom_registered": selected.get("registered", False), "registration_state": selected.get("state", "deaktiviert"),
+                "phone_registered": phone_ready, "lines": states, "outbound_line": self.settings.value.get("outbound_line", "main"),
                 "media_bridge": False}
 
     @staticmethod
@@ -94,7 +97,11 @@ class Pbx:
                 fields[key.strip()] = value.strip()
         raise RuntimeError("Ungültige AMI-Antwort.")
 
-    def originate(self, number):
+    def originate(self, number, line_id=None):
+        line_id = line_id or self.settings.value.get("outbound_line", "main")
+        line = next((line for line in effective_lines(self.settings.value) if line["id"] == line_id), None)
+        if not isinstance(number, str) or not DESTINATION.fullmatch(number) or not line or not line["enabled"] or line["incoming_mode"] != "normal":
+            raise ValueError("Ungültige ausgehende Rufnummer.")
         with socket.create_connection(("127.0.0.1", 5038), timeout=5) as sock:
             sock.settimeout(5)
             with sock.makefile("rb") as stream:
@@ -107,7 +114,7 @@ class Pbx:
                 login = action({"Action": "Login", "Username": "kioskphone", "Secret": self.settings.ami_secret, "Events": "off"})
                 if login.get("Response") != "Success":
                     raise RuntimeError("Lokale Asterisk-Anmeldung fehlgeschlagen.")
-                response = action({"Action": "Originate", "Channel": "PJSIP/100", "Context": "from-kiosk-phone",
+                response = action({"Action": "Originate", "Channel": "PJSIP/100", "Context": "from-out-" + line_id,
                                    "Exten": number, "Priority": "1", "Timeout": "30000", "Async": "true",
                                    "CallerID": "Kiosk Satellite <100>", "ActionID": str(uuid.uuid4())})
                 if response.get("Response") != "Success":

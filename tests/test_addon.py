@@ -27,7 +27,8 @@ class FakePbx:
         self.restarts = 0
         self.calls = []
         self.state = {"asterisk_running": True, "telekom_registered": True, "phone_registered": True,
-                      "registration_state": "registriert", "media_bridge": False}
+                      "registration_state": "registriert", "media_bridge": False,
+                      "lines": [{"id":"main", "enabled":True, "incoming_mode":"normal", "registered":True}]}
 
     def restart(self):
         self.restarts += 1
@@ -35,7 +36,7 @@ class FakePbx:
     def status(self):
         return self.state
 
-    def originate(self, number):
+    def originate(self, number, line_id=None):
         self.calls.append(number)
         return {"message": "Rückruf angefordert"}
 
@@ -105,9 +106,9 @@ def test_generated_pbx_isolated_ami_and_no_inbound_outbound_context(tmp_path):
     assert "write=all" not in files["manager.conf"]
     assert "pass\\;with\\punctuation" in files["pjsip.conf"]
     assert "server_uri=sip:tel.t-online.de\n" in files["pjsip.conf"]
-    assert "line=yes\nendpoint=telekom" in files["pjsip.conf"]
-    inbound = files["extensions.conf"].split("[from-telekom]")[1]
-    assert "Dial(PJSIP/100" in inbound and "@telekom" not in inbound
+    assert "line=yes\nendpoint=line-main" in files["pjsip.conf"]
+    inbound = files["extensions.conf"].split("[incoming-main]")[1]
+    assert "Dial(PJSIP/100" in inbound and "@line-" not in inbound
     assert "Echo()" in files["extensions.conf"]
 
 
@@ -173,8 +174,10 @@ def test_callback_requires_registration_and_valid_number(instance):
     assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 409
     pbx.state["phone_registered"] = True
     pbx.state["telekom_registered"] = False
+    pbx.state["lines"][0]["registered"] = False
     assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 409
     pbx.state["telekom_registered"] = True
+    pbx.state["lines"][0]["registered"] = True
     assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 200
     assert pbx.calls == ["+4921611234567"]
     assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 429
@@ -217,3 +220,89 @@ def test_provider_change_requires_fresh_credentials():
         validate({'provider':'sipgate','auth_username':'newID'},previous)
     cfg=validate({'provider':'sipgate','auth_username':'newID','auth_password':'fresh-secret'},previous)
     assert cfg['auth_password']=='fresh-secret'
+
+
+def line(id='main', number='+4921611234567', **changes):
+    return {'id':id,'label':id,'enabled':True,'incoming_mode':'normal','provider':'telekom_private',
+            'phone_number':number,'auth_mode':'access',**changes}
+
+
+def test_multiple_numbers_have_isolated_incoming_and_outbound():
+    cfg=validate(valid(lines=[line(),line('second','+4921611234568',incoming_mode='reject')]))
+    files=asterisk_files(cfg,'fake-ami')
+    assert files['pjsip.conf'].count('type=registration')==2
+    assert files['pjsip.conf'].count('type=identify')==1  # One identify per shared provider, no ambiguous IP routing.
+    dial=files['extensions.conf']
+    assert 'exten => +4921611234567,1,Goto(incoming-main,s,1)' in dial
+    assert 'exten => +4921611234568,1,Goto(incoming-second,s,1)' in dial
+    assert '[incoming-second]\nexten => s,1,Hangup(21)' in dial
+    assert '[from-out-second]' not in dial
+    assert 'Goto(from-out-main,${EXTEN},1)' in dial
+    assert 'exten => s,1,Hangup(1)' in dial
+
+
+@pytest.mark.parametrize('lines,outbound', [
+    ([line(),line('main','+4921611234568')],'main'),
+    ([line(),line('second')],'main'),
+    ([line()], 'missing'),([line(incoming_mode='reject')],'main'),
+    ([line(id='main\n[evil]')], 'main'),
+    ([line(incoming_mode='announcement')], 'main'),
+    ([line(label='bad\nname')],'main'),([line(enabled='true')],'main'),
+    ([line(provider='sipgate',auth_mode='password',auth_username='_X.',auth_password='fake')],'main'),
+    ([line(),line('second','+4921611234568',provider='sipgate',auth_mode='access')],'main'),
+])
+def test_bad_multiline_configuration_rejected(lines,outbound):
+    with pytest.raises(ValueError):
+        validate(valid(lines=lines,outbound_line=outbound))
+
+
+def test_shared_sip_user_requires_unique_contact_and_client():
+    shared={'provider':'custom','auth_mode':'password','auth_username':'fake','auth_password':'fake-secret','registrar':'sip.example.net'}
+    with pytest.raises(ValueError):
+        validate(valid(lines=[line(**shared),line('second','+4921611234568',**shared)]))
+
+
+def test_nested_passwords_redacted_and_preserved_by_line_id(tmp_path):
+    settings=Settings(tmp_path)
+    settings.save(valid(lines=[line(auth_mode='password',auth_username='fake@t-online.de',auth_password='one-secret'),line('second','+4921611234568',auth_mode='password',auth_username='other@t-online.de',auth_password='two-secret')]))
+    data=settings.public()
+    assert 'one-secret' not in json.dumps(data) and 'two-secret' not in json.dumps(data)
+    assert all('auth_password' not in item for item in data['lines'])
+    settings.save({'lines':[{**{k:v for k,v in l.items() if k!='auth_password_set'},'auth_password':''} for l in reversed(data['lines'])]})
+    assert settings.value['lines'][0]['auth_password']=='two-secret'
+    assert settings.value['lines'][1]['auth_password']=='one-secret'
+
+
+def test_legacy_config_migration_preserves_secret(tmp_path):
+    legacy=valid(auth_mode='password',auth_username='fake@t-online.de',auth_password='legacy-secret')
+    legacy.pop('web_password');legacy['lan_enabled']=False
+    (tmp_path/'telekom.json').write_text(json.dumps(legacy))
+    settings=Settings(tmp_path)
+    assert settings.public()['lines'][0]['id']=='main'
+    settings.save({'contacts':[]})
+    assert settings.value['lines'][0]['auth_password']=='legacy-secret'
+
+
+def test_incoming_only_configuration_can_disable_outbound():
+    cfg=validate(valid(lines=[line(incoming_mode='reject')],outbound_line=''))
+    assert '[from-out-' not in asterisk_files(cfg,'fake')['extensions.conf']
+
+
+def test_cli_registration_status_and_originate_context(tmp_path,monkeypatch):
+    from pbx import Pbx
+    settings=Settings(tmp_path);settings.save(valid(lines=[line(),line('second','+4921611234568')]))
+    pbx=Pbx(settings)
+    pbx.process=type('Alive',(),{'poll':lambda self:None})()
+    monkeypatch.setattr(pbx,'cli',lambda command:'line-main-registration/sip:tel.t-online.de anonymous Registered\nline-second-registration/sip:tel.t-online.de anonymous Rejected' if 'registrations' in command else '100/sip:100@192.168.2.30 hash NonQual')
+    state=pbx.status()
+    assert state['provider_registered'] and state['phone_registered']
+    assert state['lines'][1]['state']=='abgelehnt' and not state['lines'][1]['registered']
+    with pytest.raises(ValueError):pbx.originate('123','missing')
+
+
+def test_callback_cannot_select_incoming_only_line(instance):
+    _,pbx,app=instance
+    pbx.state['lines'].append({'id':'second','enabled':True,'incoming_mode':'reject','registered':True})
+    client=app.test_client()
+    assert trusted(client,'POST','/api/call',json={'number':'123','line':'second'},headers={'X-CSRF-Token':token(client)}).status_code==400
+    assert pbx.calls==[]

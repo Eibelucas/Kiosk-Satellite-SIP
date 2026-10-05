@@ -1,3 +1,11 @@
+# 26.10.3
+
+- Bis zu acht getrennte Rufnummernkonten mit eigenen Anbietern, Zugangsdaten und Status.
+- Hauptrufnummer für normale ausgehende Anrufe, weitere normale Rufnummern im Anrufpad auswählbar.
+- Eingehend normale Anrufe oder Abweisen; unbekannte Zielnummern werden abgewiesen.
+- Eindeutiges Routing auch bei mehreren Konten auf demselben SIP-Registrar.
+- Bestehende Einzelkonto-Konfiguration wird übernommen.
+
 # 26.10.2
 
 - Anbieter-Auswahl: Telekom, sipgate, easybell, FRITZ!Box und manuelle Profile für Vodafone, 1&1, o2 und eigene SIP-Konten.

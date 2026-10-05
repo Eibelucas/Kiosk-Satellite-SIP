@@ -1,5 +1,5 @@
 name: Kiosk Satellite SIP Gateway
-version: "26.10.2"
+version: "26.10.3"
 slug: kiosk_sip
 description: Asterisk und deutscher Telekom-Einrichtungsassistent für Kiosk Satellite
 url: https://github.com/Eibelucas/Kiosk-Satellite-SIP

@@ -9,6 +9,8 @@ import sys
 import tempfile
 import time
 import uuid
+import threading
+import queue
 from pathlib import Path
 
 sys.path.insert(0, "/app")
@@ -26,6 +28,35 @@ def main():
     password = "fake-phone;secret\\with-punctuation"
     cfg = {**DEFAULTS, "phone_password": password, "listen_address": "127.0.0.1",
            "local_network": "127.0.0.1/32", "sip_port": 15070}
+    cfg['phone_number'] = '+4921611234567'
+    cfg['lines'] = [{**cfg, 'id':'main', 'label':'Main', 'provider':'custom', 'enabled':True,
+                     'incoming_mode':'normal', 'auth_mode':'password', 'auth_username':'fake',
+                     'auth_password':'fake-provider-secret', 'registrar':'127.0.0.1:15071',
+                     'domain':'127.0.0.1', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
+                     'from_user':'+4921611234567', 'stun_server':''},
+                    {**cfg, 'id':'second', 'label':'Second', 'provider':'custom', 'enabled':True,
+                     'incoming_mode':'reject', 'auth_mode':'password', 'auth_username':'fake2',
+                     'auth_password':'fake-provider-secret2', 'registrar':'127.0.0.1:15071',
+                     'domain':'127.0.0.1', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
+                     'from_user':'+4921611234568', 'stun_server':''}]
+    responses = queue.Queue()
+    registrar = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    registrar.bind(('127.0.0.1',15071)); registrar.settimeout(.5)
+    stopped = threading.Event()
+    def sip_headers(msg):
+        return [row for row in msg.split('\r\n') if row.startswith(('Via:','From:','To:','Call-ID:','CSeq:'))]
+    def serve_registrar():
+        while not stopped.is_set():
+            try: packet,peer=registrar.recvfrom(16384)
+            except socket.timeout: continue
+            except OSError: return
+            msg=packet.decode()
+            if msg.startswith('REGISTER '):
+                contact=next(row for row in msg.split('\r\n') if row.startswith('Contact:'))
+                reply='SIP/2.0 200 OK\r\n'+'\r\n'.join(sip_headers(msg))+f'\r\n{contact};expires=120\r\nExpires: 120\r\nContent-Length: 0\r\n\r\n'
+                registrar.sendto(reply.encode(),peer)
+            else: responses.put(msg)
+    threading.Thread(target=serve_registrar,daemon=True).start()
     files = asterisk_files(cfg, "fake-ami-secret")
     # Independent config/control socket/database; do not stop the running add-on.
     files["manager.conf"] = "[general]\nenabled=no\n"
@@ -77,10 +108,44 @@ def main():
                 auth += f', qop=auth, nc={nc}, cnonce="{cnonce}"'
             answer = register(2, auth + "\r\n")
             assert answer.startswith("SIP/2.0 200"), answer.splitlines()[0]
+            # Two fake accounts share the same registrar. Real INVITEs must route
+            # by their called number; the secondary account is rejected, never dialed out.
+            for _ in range(40):
+                result=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show registrations'],text=True)
+                if result.count(' Registered')>=2: break
+                time.sleep(.2)
+            assert result.count(' Registered')>=2,result
+            def invite(destination, expect_phone, expected_code=None):
+                ident=uuid.uuid4().hex
+                sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
+                request=(f'INVITE sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{ident};rport\r\nMax-Forwards: 70\r\nFrom: <sip:+491701234567@127.0.0.1>;tag={ident}\r\nTo: <sip:{destination}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: 1 INVITE\r\nContact: <sip:fake@127.0.0.1:15071>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}')
+                registrar.sendto(request.encode(),('127.0.0.1',15070))
+                if expect_phone:
+                    while True:
+                        phone_msg=client.recv(16384).decode()
+                        if phone_msg.startswith('INVITE '):break
+                        # Answer qualify OPTIONS if it races the test.
+                        if phone_msg.startswith('OPTIONS '):
+                            client.sendto(('SIP/2.0 200 OK\r\n'+'\r\n'.join(sip_headers(phone_msg))+'\r\nContent-Length: 0\r\n\r\n').encode(),('127.0.0.1',15070))
+                    assert 'sip:100@' in phone_msg.splitlines()[0],phone_msg
+                    assert 'answer-after=0' not in phone_msg,phone_msg
+                    client.sendto(('SIP/2.0 486 Busy Here\r\n'+'\r\n'.join(sip_headers(phone_msg))+'\r\nContent-Length: 0\r\n\r\n').encode(),('127.0.0.1',15070))
+                deadline=time.monotonic()+6
+                while time.monotonic()<deadline:
+                    reply=responses.get(timeout=6)
+                    if f'Call-ID: {ident}' in reply and reply.startswith('SIP/2.0 ') and int(reply.split()[1])>=300:
+                        break
+                else: raise AssertionError('No final response for test INVITE')
+                code=int(reply.split()[1])
+                assert code==(expected_code or (486 if expect_phone else 603)),(destination,reply)
+            invite('+4921611234567',True)
+            invite('+4921611234568',False)
+            invite('+4921619999999',False,404)
         dialplan = subprocess.check_output(["asterisk", "-C", astconf, "-rx", "dialplan show 600@from-phone"], text=True)
         assert "Echo()" in dialplan, dialplan
-        print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation and echo dialplan. No external call made.")
+        print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, two fake provider registrations, normal/secondary incoming routing and echo dialplan. No external call made.")
     finally:
+        stopped.set(); registrar.close()
         process.terminate()
         try:
             process.wait(timeout=5)

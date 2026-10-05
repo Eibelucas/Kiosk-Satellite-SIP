@@ -29,7 +29,7 @@ PROVIDERS = {
 }
 ACCOUNT_DEFAULTS = {'registrar': '', 'domain': '', 'realm': '', 'outbound_proxy': '',
                     'client_user': '', 'contact_user': '', 'from_user': '', 'transport': 'udp', 'stun_server': ''}
-SIP_USER = re.compile(r'^[A-Za-z0-9_.+~-]{1,120}$')
+SIP_USER = re.compile(r'^[A-Za-z0-9+][A-Za-z0-9_.+~-]{0,119}$')
 HOST = re.compile(r'^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$')
 
 

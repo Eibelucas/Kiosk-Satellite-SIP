@@ -164,10 +164,15 @@ def create_app(settings, pbx, gateway_port=8088):
     def call():
         body = request.get_json(silent=True)
         number = body.get("number", "") if isinstance(body, dict) else ""
+        line_id = body.get("line", settings.value.get("outbound_line", "main")) if isinstance(body, dict) else ""
+
         if not isinstance(number, str) or not DESTINATION.fullmatch(number):
             return jsonify(ok=False, error="Ungültige Telefonnummer."), 400
         state = pbx.status()
-        if not settings.value["enabled"] or not state["telekom_registered"]:
+        line = next((line for line in state.get("lines", []) if line["id"] == line_id), None)
+        if not line or not line["enabled"] or line["incoming_mode"] != "normal":
+            return jsonify(ok=False, error="Eine aktive normale Rufnummer auswählen."), 400
+        if not line["registered"]:
             return jsonify(ok=False, error="Der SIP-Anbieter ist noch nicht registriert. Einrichtung und Status prüfen."), 409
         if not state["phone_registered"]:
             return jsonify(ok=False, error="SIP-Telefon 100 anmelden. Der Kiosk selbst hat noch keine Audio-Bridge."), 409
@@ -177,7 +182,7 @@ def create_app(settings, pbx, gateway_port=8088):
                 return jsonify(ok=False, error="Ein Rückruf wurde gerade angefordert. Bitte kurz warten."), 429
             last_call[0] = now
         try:
-            return jsonify(ok=True, **pbx.originate(number))
+            return jsonify(ok=True, **pbx.originate(number, line_id))
         except (OSError, RuntimeError):
             return jsonify(ok=False, error="Asterisk hat den Rückruf nicht angenommen. Add-on-Protokoll prüfen."), 502
 

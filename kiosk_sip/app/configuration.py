@@ -15,7 +15,7 @@ DEFAULTS = {
     "auth_password": "", "listen_address": "127.0.0.1",
     "local_network": "192.168.2.0/24", "external_address": "",
     "sip_port": 5070, "phone_password": "", "lan_enabled": False,
-    "web_username": "kiosk", "web_password_hash": "", "contacts": [], **ACCOUNT_DEFAULTS,
+    "web_username": "kiosk", "web_password_hash": "", "contacts": [], "lines": [], "outbound_line": "main", **ACCOUNT_DEFAULTS,
 }
 INPUT_FIELDS = (set(DEFAULTS) - {"web_password_hash"}) | {"web_password"}
 PHONE = re.compile(r"^\+[1-9][0-9]{6,14}$")
@@ -45,6 +45,65 @@ def secret_value(value, label, minimum=0):
     return value
 
 
+ACCOUNT_FIELDS = {"enabled", "provider", "phone_number", "auth_mode", "auth_username", "auth_password"} | set(ACCOUNT_DEFAULTS)
+LINE_FIELDS = ACCOUNT_FIELDS | {"id", "label", "incoming_mode"}
+
+
+def effective_lines(cfg):
+    if cfg.get("lines"):
+        return cfg["lines"]
+    if cfg.get("phone_number"):
+        return [{**{k: cfg.get(k, DEFAULTS[k]) for k in ACCOUNT_FIELDS}, "id": "main", "label": "Hauptrufnummer", "incoming_mode": "normal"}]
+    return []
+
+
+def incoming_aliases(line):
+    account = resolve(line)
+    number = line["phone_number"]
+    aliases = {number, number[1:], "00" + number[1:], account["contact_user"], account["client_user"]}
+    if number.startswith("+49"):
+        aliases.add("0" + number[3:])
+    return sorted(aliases)
+
+
+def validate_line(raw, previous=None):
+    if not isinstance(raw, dict) or set(raw) - LINE_FIELDS:
+        raise ValueError("Ungültiges Rufnummernkonto.")
+    cfg = {**{k: DEFAULTS[k] for k in ACCOUNT_FIELDS}, "id": "main", "label": "Rufnummer", "incoming_mode": "normal", **(previous or {}), **raw}
+    if not isinstance(cfg["id"], str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", cfg["id"]):
+        raise ValueError("Konto-ID: Kleinbuchstaben, Ziffern, Unterstrich oder Bindestrich, beginnend mit Buchstabe.")
+    if not isinstance(cfg["label"], str) or not 1 <= len(cfg["label"].strip()) <= 80:
+        raise ValueError("Jede Rufnummer benötigt einen Namen.")
+    secret_value(cfg["label"], "Rufnummernname")
+    if type(cfg["enabled"]) is not bool or cfg["incoming_mode"] not in {"normal", "reject"}:
+        raise ValueError("Ungültige Rufnummern-Rolle.")
+    if not isinstance(cfg["provider"], str) or cfg["provider"] not in PROVIDERS:
+        raise ValueError("Unbekannter Anbieter.")
+    if cfg["auth_mode"] not in {"access", "password"} or (cfg["auth_mode"] == "access" and cfg["provider"] != "telekom_private"):
+        raise ValueError("Dieser Anbieter benötigt SIP-Benutzername und SIP-Passwort.")
+    if not isinstance(cfg["phone_number"], str) or not PHONE.fullmatch(cfg["phone_number"]):
+        raise ValueError("Rufnummer international, etwa +492611234567, ohne Leerzeichen eingeben.")
+    if not isinstance(cfg["auth_username"], str):
+        raise ValueError("Ungültiger SIP-Benutzername.")
+    changed = previous and (any(cfg[k] != previous.get(k) for k in ("provider", "auth_username")) or
+        any(resolve(cfg)[k] != resolve(previous)[k] for k in ("registrar", "domain", "client_user")))
+    password = raw.get("auth_password")
+    if password is not None and not isinstance(password, str):
+        raise ValueError("Ungültiges SIP-Passwort.")
+    if password:
+        cfg["auth_password"] = secret_value(password, "SIP-Passwort")
+    else:
+        cfg["auth_password"] = "" if changed else (previous or {}).get("auth_password", "")
+    if cfg["auth_mode"] == "access":
+        cfg["auth_username"], cfg["auth_password"] = "anonymous@t-online.de", ""
+    else:
+        user = cfg["auth_username"]
+        if not isinstance(user, str) or not re.fullmatch(r"[A-Za-z0-9._+@~-]{1,120}", user) or not cfg["auth_password"] or (cfg["provider"] == "telekom_private" and user != user.lower()):
+            raise ValueError("SIP-Benutzername und Passwort eintragen. Telekom-Benutzernamen müssen kleingeschrieben sein.")
+    validate_account(cfg)
+    return cfg
+
+
 def validate(body, previous=None):
     if not isinstance(body, dict) or set(body) - INPUT_FIELDS:
         raise ValueError("Ungültige Konfiguration.")
@@ -53,18 +112,46 @@ def validate(body, previous=None):
     for key in ("enabled", "lan_enabled"):
         if not isinstance(cfg[key], bool):
             raise ValueError("Ungültiger Schalter.")
-    if not isinstance(cfg["provider"], str) or cfg["provider"] not in PROVIDERS:
-        raise ValueError("Unbekannter Anbieter.")
-    if previous and cfg["provider"] != previous["provider"]:
-        cfg["auth_password"] = ""
-        for key in ACCOUNT_DEFAULTS:
-            if key not in body:
-                cfg[key] = ACCOUNT_DEFAULTS[key]
-    if cfg["auth_mode"] not in {"access", "password"} or (cfg["auth_mode"] == "access" and cfg["provider"] != "telekom_private"):
-        raise ValueError("Dieser Anbieter benötigt SIP-Benutzername und SIP-Passwort.")
-    number = cfg["phone_number"]
-    if not isinstance(number, str) or not PHONE.fullmatch(number):
-        raise ValueError("Rufnummer international, zum Beispiel +492611234567, ohne Leerzeichen eingeben.")
+    prior_lines = {line["id"]: line for line in effective_lines(previous or {})}
+    if "lines" in body:
+        raw_lines = body["lines"]
+    elif cfg.get("lines") and not (set(body) & ACCOUNT_FIELDS):
+        raw_lines = cfg["lines"]
+    else:
+        if previous and body.get("provider", cfg["provider"]) != previous["provider"]:
+            for key in ACCOUNT_DEFAULTS:
+                if key not in body:
+                    cfg[key] = ACCOUNT_DEFAULTS[key]
+        raw_lines = [{**{k: cfg[k] for k in ACCOUNT_FIELDS if k != "auth_password"}, "id": "main", "label": "Hauptrufnummer", "incoming_mode": "normal"}]
+        if "auth_password" in body:
+            raw_lines[0]["auth_password"] = body["auth_password"]
+    if not isinstance(raw_lines, list) or not 1 <= len(raw_lines) <= 8:
+        raise ValueError("Eine bis acht Rufnummern einrichten.")
+    lines, ids, numbers, aliases = [], set(), set(), set()
+    for raw in raw_lines:
+        line = validate_line(raw, prior_lines.get(raw.get("id")) if isinstance(raw, dict) else None)
+        if line["id"] in ids or line["phone_number"] in numbers:
+            raise ValueError("Rufnummern und Konto-IDs dürfen nicht doppelt vorkommen.")
+        ids.add(line["id"]); numbers.add(line["phone_number"])
+        if line["enabled"]:
+            server = resolve(line)["registrar"].split(":")[0].lower()
+            for alias in incoming_aliases(line):
+                key = (server, alias)
+                if key in aliases:
+                    raise ValueError("Eingehende SIP-Ziel-IDs desselben Servers müssen eindeutig sein. Eigene SIP-Konten oder Contact-User verwenden.")
+                aliases.add(key)
+        lines.append(line)
+    if sum(line["enabled"] and line["provider"] == "telekom_private" for line in lines) > 5:
+        raise ValueError("Telekom erlaubt maximal fünf SIP-Clients; weitere Geräte am Anschluss mitzählen.")
+    cfg["lines"] = lines
+    cfg.update({key: lines[0][key] for key in ACCOUNT_FIELDS})
+    cfg["enabled"] = any(line["enabled"] for line in lines)
+    selected = cfg["outbound_line"]
+    if not isinstance(selected, str) or (selected and selected not in ids):
+        raise ValueError("Eine vorhandene Rufnummer für ausgehende Anrufe auswählen.")
+    outbound = next((line for line in lines if line["id"] == selected), None)
+    if outbound and cfg["enabled"] and (not outbound["enabled"] or outbound["incoming_mode"] != "normal"):
+        raise ValueError("Ausgehend eine aktive normale Rufnummer auswählen.")
     try:
         address = ipaddress.IPv4Address(cfg["listen_address"])
         network = ipaddress.IPv4Network(cfg["local_network"], strict=False)
@@ -86,17 +173,9 @@ def validate(body, previous=None):
             raise ValueError("Die externe IPv4-Adresse muss öffentlich sein.")
     if type(cfg["sip_port"]) is not int or not 1024 <= cfg["sip_port"] <= 65535 or cfg["sip_port"] in {5038, 8088, 8099}:
         raise ValueError("SIP-Port zwischen 1024 und 65535 verwenden, Standard 5070.")
-    for key, label, minimum in (("auth_password", "Telekom-Passwort", 0), ("phone_password", "SIP-Telefon-Passwort", 12)):
-        value = body.get(key)
-        if value is not None and value != "":
-            cfg[key] = secret_value(value, label, minimum)
-    if cfg["auth_mode"] == "access":
-        cfg["auth_username"], cfg["auth_password"] = "anonymous@t-online.de", ""
-    else:
-        user = cfg["auth_username"]
-        if not isinstance(user, str) or not re.fullmatch(r"[A-Za-z0-9._+@~-]{1,120}", user) or not cfg["auth_password"] or (cfg["provider"] == "telekom_private" and user != user.lower()):
-            raise ValueError("SIP-Benutzername und Passwort eintragen. Telekom-Benutzernamen müssen kleingeschrieben sein.")
-    validate_account(cfg)
+    value = body.get("phone_password")
+    if value is not None and value != "":
+        cfg["phone_password"] = secret_value(value, "SIP-Telefon-Passwort", 12)
     secret_value(cfg["phone_password"], "SIP-Telefon-Passwort", 12)
     if not isinstance(cfg["web_username"], str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,40}", cfg["web_username"]):
         raise ValueError("Kiosk-Benutzername: nur Buchstaben, Ziffern, Unterstrich und Bindestrich.")
@@ -147,7 +226,9 @@ class Settings:
         return {**{k: v for k, v in self.value.items() if k not in {"auth_password", "phone_password", "web_password_hash"}},
                 "auth_password_set": bool(self.value["auth_password"]),
                 "phone_password_set": bool(self.value["phone_password"]),
-                "web_password_set": bool(self.value["web_password_hash"])}
+                "web_password_set": bool(self.value["web_password_hash"]),
+                "lines": [{**{k: v for k, v in line.items() if k != "auth_password"},
+                           "auth_password_set": bool(line["auth_password"])} for line in effective_lines(self.value)]}
 
 
 def ini(value):
@@ -201,11 +282,17 @@ max_contacts=1
 remove_existing=yes
 qualify_frequency=30
 """
-    account = resolve(cfg) if cfg["enabled"] else None
-    if cfg["enabled"]:
-        auth = "outbound_auth=telekom-auth\n" if cfg["auth_mode"] == "password" else ""
+    lines = [line for line in effective_lines(cfg) if line["enabled"]]
+    groups = {}
+    for line in lines:
+        account = resolve(line)
+        server = account["registrar"].split(":")[0].lower()
+        groups.setdefault(server, len(groups))
+        identifier, context = "line-" + line["id"], "from-provider-" + str(groups[server])
+        auth = f"outbound_auth={identifier}-auth\n" if line["auth_mode"] == "password" else ""
+        proxy = f"outbound_proxy={ini('sip:' + account['outbound_proxy'] + ';lr')}\n" if account["outbound_proxy"] else ""
         pjsip += f"""
-[telekom-registration]
+[{identifier}-registration]
 type=registration
 transport=transport-{account['transport']}
 server_uri=sip:{account['registrar']}
@@ -215,37 +302,31 @@ retry_interval=60
 forbidden_retry_interval=300
 expiration=600
 line=yes
-endpoint=telekom
-{auth}
-[telekom]
+endpoint={identifier}
+{auth}{proxy}
+[{identifier}]
 type=endpoint
 transport=transport-{account['transport']}
-context=from-telekom
+context={context}
 disallow=all
 allow=alaw,ulaw
-aors=telekom-aor
+aors={identifier}-aor
 from_user={account['from_user']}
 from_domain={account['domain']}
 send_pai=yes
 direct_media=no
 force_rport=yes
 rtp_symmetric=yes
-{auth}
-[telekom-aor]
+{auth}{proxy}
+[{identifier}-aor]
 type=aor
 contact=sip:{account['registrar']}
-
-[telekom-identify]
-type=identify
-endpoint=telekom
-match={account['registrar'].split(':')[0]}
-srv_lookups=yes
 """
-        if account['outbound_proxy']:
-            proxy = f"outbound_proxy={ini('sip:' + account['outbound_proxy'] + ';lr')}\n"
-            pjsip = pjsip.replace('[telekom-registration]\n', '[telekom-registration]\n' + proxy).replace('[telekom]\n', '[telekom]\n' + proxy)
         if auth:
-            pjsip += f"\n[telekom-auth]\ntype=auth\nauth_type=userpass\nusername={ini(cfg['auth_username'])}\npassword={ini(cfg['auth_password'])}\nrealm={ini(account['realm']) or '*'}\n"
+            pjsip += f"\n[{identifier}-auth]\ntype=auth\nauth_type=userpass\nusername={ini(line['auth_username'])}\npassword={ini(line['auth_password'])}\nrealm={ini(account['realm']) or '*'}\n"
+    for server, group in groups.items():
+        first = next(line for line in lines if resolve(line)["registrar"].split(":")[0].lower() == server)
+        pjsip += f"\n[provider-{group}-identify]\ntype=identify\nendpoint=line-{first['id']}\nmatch={server}\nsrv_lookups=yes\n"
     dial = """[general]
 static=yes
 writeprotect=yes
@@ -259,10 +340,31 @@ include => from-kiosk-phone
 
 [from-kiosk-phone]
 """
-    if cfg["enabled"]:
+    selected = next((line for line in lines if line["id"] == cfg.get("outbound_line", "main") and line["incoming_mode"] == "normal"), None)
+    if selected:
         for pattern in ("_X.", "_+X.", "_*X.", "_#X."):
-            dial += f"exten => {pattern},1,Set(CALLERID(num)={cfg['phone_number']})\n same => n,Dial(PJSIP/${{EXTEN}}@telekom,60)\n same => n,Hangup()\n"
-    dial += "\n[from-telekom]\nexten => _+X.,1,Dial(PJSIP/100,45)\n same => n,Hangup()\nexten => _X.,1,Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+            dial += f"exten => {pattern},1,Goto(from-out-{selected['id']},${{EXTEN}},1)\n"
+    for line in lines:
+        if line["incoming_mode"] == "normal":
+            dial += f"\n[from-out-{line['id']}]\n"
+            for pattern in ("_X.", "_+X.", "_*X.", "_#X."):
+                dial += f"exten => {pattern},1,Set(CALLERID(num)={line['phone_number']})\n same => n,Dial(PJSIP/${{EXTEN}}@line-{line['id']},60)\n same => n,Hangup()\n"
+    for server, group in groups.items():
+        dial += f"\n[from-provider-{group}]\n"
+        for line in lines:
+            if resolve(line)["registrar"].split(":")[0].lower() != server:
+                continue
+            for alias in incoming_aliases(line):
+                dial += f"exten => {alias},1,Goto(incoming-{line['id']},s,1)\n"
+        # Unknown called numbers never fall through into an outbound context.
+        dial += "exten => _X.,1,Hangup(1)\nexten => _+X.,1,Hangup(1)\nexten => s,1,Hangup(1)\n"
+    for line in lines:
+        dial += f"\n[incoming-{line['id']}]\nexten => s,1,"
+        if line["incoming_mode"] == "normal":
+            dial += "Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+        else:
+            dial += "Hangup(21)\n"
+    account = resolve(selected) if selected else None
     return {
         "pjsip.conf": pjsip, "extensions.conf": dial,
         "manager.conf": f"[general]\nenabled=yes\nwebenabled=no\nbindaddr=127.0.0.1\nport=5038\n\n[kioskphone]\nsecret={ini(ami_secret)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\nread=none\nwrite=originate\n",

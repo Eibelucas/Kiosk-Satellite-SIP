@@ -53,6 +53,21 @@ Der Assistent setzt Registrar, SIP-Domäne und Proxy-Ziel auf `tel.t-online.de`.
 
 **Danach das Add-on einmal neu starten**, wenn LAN-Zugriff oder NAS-Adresse geändert wurden. Der LAN-Webserver bindet beim Start an die eingetragene NAS-IP. Asterisk bindet den SIP-Port ebenfalls an diese IP.
 
+## Mehrere Rufnummern und Hauptrufnummer
+
+Unter **Rufnummer hinzufügen** legst du bis zu acht einzelne SIP-Konten an. Telekom: höchstens fünf aktive Konten, wobei andere SIP-Clients am Anschluss mitzählen. Jede Rufnummer hat einen Namen, eine eigene Anbieter-Konfiguration und einen Status. Gespeicherte Konten werden intern an ihrer Konto-ID erkannt; Umsortieren ändert ihre Passwörter nicht.
+
+- **Normal auf Telefon 100 klingeln**: normale eingehende Gespräche, ohne Auto-Answer.
+- **Abweisen**: Konto darf registriert bleiben, eingehende Anrufe werden abgewiesen. Geeignet zum Vorbereiten einer zweiten Nummer.
+- **Dieses Konto registrieren** aus: keine Anmeldung beim Anbieter.
+- **Standardrufnummer für ausgehende Anrufe**: deine normale Hauptrufnummer. Alternativ keine ausgehenden Anrufe. Das Anrufpad kann eine andere aktive normale Nummer auswählen.
+
+Deine bestehenden Telekom-Daten werden als **Hauptrufnummer** übernommen. Alte `/data/telekom.json` bleibt der Speicherort; keine Passwörter ins Git-Repository kopieren. Bei Wechsel des SIP-Benutzers, Registrars oder der Anmelde-ID ist ein neues SIP-Passwort nötig.
+
+Für die eingehende Zuordnung nutzt Asterisk die konkrete Ziel-ID: internationale Nummer, nationale deutsche Schreibweise und die konfigurierte Client-/Contact-ID. Konten auf demselben Registrar müssen eindeutige Ziel-IDs haben. Unbekannte Ziele werden abgewiesen und können keine externen Nummern wählen. Ein gemeinsamer SIP-Trunk mit einer Registrierung für mehrere Durchwahlen ist derzeit kein fertiges Trunk-Profil; lege separate SIP-Geräte/Konten an, soweit dein Anbieter dies unterstützt.
+
+Bei einer FRITZ!Box für jede Rolle ein eigenes IP-Telefon anlegen und in der Box **nur die zugehörige eingehende Nummer** zuweisen. Sonst kann die Box schon vor dem Add-on mehrere Nummern auf denselben SIP-Benutzer zusammenführen.
+
 ## 3. SIP-Telefon anmelden und Audio testen
 
 Das installierte Kiosk-Plugin ist derzeit ein Launcher für die Telefonseite. **Es nimmt SIP-/RTP-Audio noch nicht über Kiosk Satellite Intercom entgegen.** Verwende für den ersten Test ein SIP-Telefon oder eine SIP-Softphone-App im selben Heimnetz.
@@ -69,7 +84,7 @@ Das installierte Kiosk-Plugin ist derzeit ein Launcher für die Telefonseite. **
 
 1. Registrierung einschalten. In der HA-Weboberfläche auf **Aktualisieren** drücken. Telefon 100 muss angemeldet sein.
 2. Auf dem SIP-Telefon **600** wählen. Dieser lokale Echo-Test ruft niemanden extern an. Wenn du dich selbst hörst, ist der lokale Audio-Pfad vorhanden.
-3. Telekom-Status prüfen: **registriert**. **wartet** ist kein Erfolgsnachweis; Registrierung kann einige Sekunden dauern.
+3. Status der gewünschten Rufnummer prüfen: **registriert**. **wartet** ist kein Erfolgsnachweis; Registrierung kann einige Sekunden dauern.
 
 Nur ein SIP-Gerät gleichzeitig auf Nebenstelle 100 verwenden. Ein neu angemeldetes Gerät ersetzt die bisherige Registrierung.
 
