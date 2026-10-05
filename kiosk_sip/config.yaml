@@ -1,0 +1,21 @@
+name: Kiosk Satellite SIP Gateway
+version: "0.1.0"
+slug: kiosk_sip
+description: Asterisk und deutscher Telekom-Einrichtungsassistent für Kiosk Satellite
+url: https://github.com/Eibelucas/Kiosk-Satellite-SIP
+arch:
+  - amd64
+startup: services
+boot: auto
+init: true
+stage: experimental
+host_network: true
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:phone-settings
+panel_title: SIP Telefon
+panel_admin: true
+options:
+  gateway_port: 8088
+schema:
+  gateway_port: port

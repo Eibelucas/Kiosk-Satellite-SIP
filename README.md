@@ -1,5 +1,23 @@
 # Kiosk Satellite SIP
 
+## Auf deinem HAOS installieren
+
+Für **HAOS direkt auf einem UGREEN DXP2800** gibt es jetzt ein gemeinsames Add-on mit **Asterisk, Telefon-Gateway und deutschem Telekom-Onboarding**.
+
+1. HA → Einstellungen → Apps/Add-ons → Store → Drei-Punkte-Menü → Repositories.
+2. `https://github.com/Eibelucas/Kiosk-Satellite-SIP` hinzufügen.
+3. **Kiosk Satellite SIP Gateway** installieren und starten.
+4. **Weboberfläche öffnen** und die vier Einrichtungsschritte durchgehen.
+5. Anschließend das Add-on neu starten, ein SIP-Telefon als Nebenstelle **100** anmelden und im Kiosk-Plugin die angezeigte **Gateway URL** setzen.
+
+**[Vollständige Anleitung für HAOS und Telekom](kiosk_sip/DOCS.md)**. Diese Anleitung steht auch im Dokumentations-Tab des Add-ons.
+
+**Aktueller Umfang:** Anrufpad und Kontakte öffnen, SIP-Telefon 100 zurückrufen und nach dem Annehmen über Telekom wählen. Eingehende Anrufe können auf Telefon 100 klingeln. Die direkte Audio-Verbindung zu **Kiosk Satellite Intercom ist noch nicht implementiert**; zum Sprechen ist derzeit ein SIP-Telefon oder Softphone erforderlich. Das Onboarding unterstützt Telekom Privatkunden, keinen Business-SIP-Trunk oder MagentaZuhause Regio.
+
+Die Plugin-Release `v0.1.0` bleibt unverändert auf ihrem ursprünglichen Quellstand. Das HAOS-Add-on wird separat aus `main` installiert.
+
+## Standalone-Prototyp und Architektur
+
 Unofficial SIP/telephone extension for [Kiosk Satellite](https://github.com/jxlarrea/kiosk-satellite).
 
 The project is split into two parts:

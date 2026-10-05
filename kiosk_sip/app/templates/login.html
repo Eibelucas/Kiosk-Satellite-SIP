@@ -1,0 +1,4 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Telefon anmelden</title><link rel="stylesheet" href="static/style.css"></head>
+<body><main class="narrow"><div class="eyebrow">KIOSK SATELLITE SIP</div><h1>Dein Telefon.</h1><p class="muted">Melde dich mit dem Kiosk-Zugang aus dem HA-Einrichtungsassistenten an.</p>
+<form method="post" class="card"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Benutzername<input name="username" autocomplete="username" required maxlength="40"></label><label>Kiosk-Passwort<input type="password" name="password" autocomplete="current-password" required maxlength="256"></label><p class="error" role="alert">{{ error }}</p><button class="primary" type="submit">Anmelden</button></form><p class="muted small">Die Telekom-Zugangsdaten gehören hier nicht hinein.</p></main></body></html>
