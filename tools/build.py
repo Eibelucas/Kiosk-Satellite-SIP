@@ -3,7 +3,6 @@ import argparse
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 import zipfile
@@ -81,5 +80,6 @@ with tempfile.TemporaryDirectory(prefix='kiosk-sip-plugin-') as temp_name:
         package.unlink()
         raise SystemExit('Plugin package exceeds Kiosk Satellite 4 MB limit')
 
-    shutil.copyfile(manifest_path, out / 'kiosk-satellite-plugin.json')
+    # Kiosk Satellite validates the release manifest against the package manifest.
+    (out / 'kiosk-satellite-plugin.json').write_bytes(manifest_bytes)
     print(package)
