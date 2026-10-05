@@ -35,7 +35,7 @@ def main():
                      'domain':'127.0.0.1', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
                      'from_user':'+4921611234567', 'stun_server':''},
                     {**cfg, 'id':'second', 'label':'Second', 'provider':'custom', 'enabled':True,
-                     'incoming_mode':'reject', 'auth_mode':'password', 'auth_username':'fake2',
+                     'incoming_mode':'reject', 'phone_number':'+4921611234568', 'auth_mode':'password', 'auth_username':'fake2',
                      'auth_password':'fake-provider-secret2', 'registrar':'127.0.0.1:15071',
                      'domain':'127.0.0.1', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
                      'from_user':'+4921611234568', 'stun_server':''}]
@@ -58,6 +58,9 @@ def main():
             else: responses.put(msg)
     threading.Thread(target=serve_registrar,daemon=True).start()
     files = asterisk_files(cfg, "fake-ami-secret")
+    # The tiny fake phone has no background OPTIONS handler while waiting for
+    # provider registrations; disable qualification for this test phone only.
+    files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0')
     # Independent config/control socket/database; do not stop the running add-on.
     files["manager.conf"] = "[general]\nenabled=no\n"
     for old, new in (("/etc/asterisk", str(base / "config")), ("/run/asterisk", str(base / "run")),
@@ -111,6 +114,8 @@ def main():
                 auth += f', qop=auth, nc={nc}, cnonce="{cnonce}"'
             answer = register(2, auth + "\r\n")
             assert answer.startswith("SIP/2.0 200"), answer.splitlines()[0]
+            contacts=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show contacts'],text=True)
+            assert '100/sip:100@' in contacts,contacts
             # Two fake accounts share the same registrar. Real INVITEs must route
             # by their called number; the secondary account is rejected, never dialed out.
             for _ in range(40):
