@@ -34,7 +34,7 @@ class LanOnly:
         return self.app(environ, start_response)
 
 
-def create_app(settings, pbx, gateway_port=8088):
+def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
     app = Flask(__name__)
     app.secret_key = settings.session_secret
     app.config.update(MAX_CONTENT_LENGTH=65536, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_NAME="kiosk_sip_session",
@@ -141,7 +141,7 @@ def create_app(settings, pbx, gateway_port=8088):
         body = request.get_json(silent=True)
         try:
             with save_lock:
-                if isinstance(body, dict) and body.get("sip_port") in {gateway_port, 8099}:
+                if isinstance(body, dict) and body.get("sip_port", settings.value["sip_port"]) in (gateway_port, ingress_port):
                     raise ValueError("SIP-Port und Web-Port müssen unterschiedlich sein.")
                 settings.save(body)
                 pbx.restart()
@@ -149,12 +149,14 @@ def create_app(settings, pbx, gateway_port=8088):
         except ValueError as exc:
             return jsonify(ok=False, error=str(exc)), 400
         except (OSError, RuntimeError):
-            return jsonify(ok=False, error="Konfiguration gespeichert, Asterisk konnte nicht neu starten. Add-on-Protokoll prüfen."), 503
+            error = getattr(pbx, "last_error", "") or "Asterisk konnte nicht neu starten. Add-on-Protokoll prüfen."
+            return jsonify(ok=False, error="Konfiguration gespeichert. " + error), 503
 
     @app.get("/api/status")
     def status():
         return jsonify(ok=True, **pbx.status(), configured=bool(settings.value["phone_password"]),
-                       enabled=settings.value["enabled"], lan_enabled=settings.value["lan_enabled"])
+                       enabled=settings.value["enabled"], lan_enabled=settings.value["lan_enabled"],
+                       lan_error=app.config.get("LAN_ERROR", ""))
 
     @app.get("/api/contacts")
     def contacts():

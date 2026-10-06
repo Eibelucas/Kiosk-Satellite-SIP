@@ -12,6 +12,12 @@ Für HAOS direkt auf einem UGREEN DXP2800 (amd64). Kein UGOS, keine zusätzliche
 
 Unter **Konfiguration** ist nur der Port der Kiosk-Telefonseite einstellbar (Standard `8088`). Die Anbieter-Einrichtung erfolgt in der Weboberfläche. Nach Änderung des Ports das Add-on neu starten.
 
+Ab **26.10.6** weist Home Assistant den internen Ingress-Port dynamisch zu. Ein anderer Dienst auf `8099` verhindert die Einrichtung dadurch nicht mehr. Dazu liest das Add-on ausschließlich seine eigenen Informationen über die Supervisor-API mit der Standardrolle; der Supervisor-Token wird nicht angezeigt oder gespeichert.
+
+**Bei einem vorhandenen Startfehler:** Im Add-on-Store nach Updates suchen, das **HA-Add-on auf 26.10.6 aktualisieren** und neu starten. Das Aktualisieren des Kiosk-Plugins allein repariert den HA-Container nicht. Anschließend **Weboberfläche öffnen**. Wenn dort ein belegter SIP-Port gemeldet wird, unter **Heimnetz → SIP-Port** einen freien Port eintragen, z. B. `5072`, und speichern. Am SIP-Telefon denselben Port setzen. Gespeicherte Rufnummern und Zugangsdaten bleiben erhalten; kein Neuinstallieren oder Löschen nötig.
+
+Bei belegtem SIP-/AMI-Port bleibt die HA-Einrichtung erreichbar und zeigt den Fehler. Ein belegter LAN-Webport deaktiviert nur die Kiosk-Webseite: unter **Add-on-Konfiguration → gateway_port** einen freien Port wählen und neu starten. Der tatsächliche SIP-Status steht im Assistenten; ein erreichbares Add-on bedeutet nicht automatisch einen angemeldeten Anschluss.
+
 Falls das Add-on nicht erscheint: Store neu laden und sicherstellen, dass die URL ohne `/tree/…`, `/releases/…` oder Dateipfad eingetragen ist. Die App unterstützt derzeit ausschließlich amd64.
 
 ## 2. Anbieter-Onboarding
@@ -142,6 +148,9 @@ Eingehende Telekom-Anrufe werden auf SIP-Telefon 100 weitergeleitet. Voraussetzu
 | Symptom | Nächster Schritt |
 | --- | --- |
 | Asterisk startet nicht | Add-on-Protokoll lesen. NAS-IP muss auf HAOS tatsächlich vorhanden und SIP-Port frei sein. |
+| `Address in use` auf `8099` / Ingress-Traceback | HA-Add-on auf 26.10.6 aktualisieren und neu starten; Ingress verwendet den von HA zugewiesenen Port. |
+| `transport-udp`: `Address in use` | HA-Weboberfläche → Heimnetz → SIP-Port auf einen freien Port ändern und speichern; Telefon 100 auf denselben Port ändern. |
+| AMI-Port `5038` belegt | Anderen lokalen Asterisk-/AMI-Dienst prüfen. Beide Dienste dürfen denselben Loopback-Port nicht gleichzeitig verwenden. |
 | Telekom: abgelehnt | Rufnummer/Anschlusstyp prüfen, ggf. zur Passwort-Anmeldung wechseln. Authentifizierungsname und Rufnummer sind unterschiedliche Felder. |
 | Telekom: wartet | DNS, Internetzugang und SIP-Verkehr am Router prüfen. Beim Verbindungsaufbau kurz warten, dann Status aktualisieren. |
 | Telefon 100 fehlt | NAS-IP, Port, UDP, Benutzer `100` und dessen eigenes Passwort prüfen. Beide Geräte müssen im angegebenen Heimnetz liegen. |
@@ -162,6 +171,8 @@ Anschlusskonfiguration, Kontakte, Sitzungsschlüssel und AMI-Schlüssel liegen i
 - [Telekom: SIP-Client-Einstellungen](https://www.telekom.de/hilfe/internet-telefonie/telefonie/voice-over-ip-sip-client)
 - [Home Assistant: App-/Add-on-Repositories](https://developers.home-assistant.io/docs/apps/repository/)
 - [Home Assistant: Ingress und Präsentation](https://developers.home-assistant.io/docs/apps/presentation/)
+- [Home Assistant: Dynamischer Ingress-Port bei Host-Netzwerk](https://developers.home-assistant.io/docs/apps/configuration/)
+- [Home Assistant: Supervisor-API / App-Informationen](https://developers.home-assistant.io/docs/api/supervisor/endpoints/)
 - [Asterisk: Outbound Registrations](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-Outbound-Registrations/)
 - [Asterisk: NAT-Konfiguration](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-res_pjsip-to-work-through-NAT/)
 

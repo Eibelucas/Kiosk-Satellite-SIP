@@ -25,6 +25,8 @@ jobs:
           node --check kiosk_sip/app/static/phone.js
       - name: Build amd64 add-on
         run: docker build -t kiosk-sip-test kiosk_sip
+      - name: Host-network port conflict and assigned ingress regression
+        run: docker run --rm -v "$PWD/tests/host_network_smoke.py:/tmp/host_network_smoke.py:ro" --entrypoint /opt/venv/bin/python kiosk-sip-test /tmp/host_network_smoke.py
       - name: Asterisk startup and local SIP authentication test
         run: |
           docker run -d --name kiosk-sip-test kiosk-sip-test

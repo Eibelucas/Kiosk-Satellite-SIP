@@ -10,5 +10,5 @@ LABEL org.opencontainers.image.title="Kiosk Satellite SIP Gateway" \
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s \
-  CMD asterisk -rx 'core show uptime' >/dev/null || exit 1
+  CMD /opt/venv/bin/python -c 'import socket; socket.create_connection(("127.0.0.1", int(open("/run/kiosk-sip-ingress-port").read())), timeout=3).close()' || exit 1
 CMD ["/opt/venv/bin/python", "/app/run.py"]

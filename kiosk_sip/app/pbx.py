@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from configuration import asterisk_files, effective_lines, DESTINATION
+from networking import PortConflict, check_port
 
 
 class Pbx:
@@ -16,6 +17,7 @@ class Pbx:
         self.settings = settings
         self.process = None
         self.lock = threading.RLock()
+        self.last_error = ""
 
     def write_config(self):
         import pwd
@@ -34,15 +36,26 @@ class Pbx:
     def restart(self):
         with self.lock:
             self.stop()
-            self.write_config()
-            self.process = subprocess.Popen(["asterisk", "-f", "-C", "/etc/asterisk/asterisk.conf", "-U", "asterisk", "-G", "asterisk"])
-            for _ in range(40):
-                if self.process.poll() is not None:
-                    raise RuntimeError("Asterisk konnte nicht starten. Add-on-Protokoll prüfen.")
-                if "System uptime" in self.cli("core show uptime"):
-                    return
-                time.sleep(0.25)
-            raise RuntimeError("Asterisk startet noch. Status und Add-on-Protokoll prüfen.")
+            self.last_error = ""
+            try:
+                cfg = self.settings.value
+                for protocol in ("UDP", "TCP"):
+                    check_port(cfg["listen_address"], cfg["sip_port"], protocol, "SIP")
+                check_port("127.0.0.1", 5038, "TCP", "AMI")
+                self.write_config()
+                self.process = subprocess.Popen(["asterisk", "-f", "-C", "/etc/asterisk/asterisk.conf", "-U", "asterisk", "-G", "asterisk"])
+                for _ in range(40):
+                    if self.process.poll() is not None:
+                        raise RuntimeError("Asterisk konnte nicht starten. Add-on-Protokoll prüfen.")
+                    transports = self.cli("pjsip show transports")
+                    if "System uptime" in self.cli("core show uptime") and all(name in transports for name in ("transport-udp", "transport-tcp")):
+                        return
+                    time.sleep(0.25)
+                raise RuntimeError("Asterisk/SIP-Transport konnte nicht starten. SIP-Port, NAS-IP und Add-on-Protokoll prüfen.")
+            except (OSError, RuntimeError) as exc:
+                self.last_error = str(exc) if isinstance(exc, PortConflict) else "Asterisk/SIP-Transport konnte nicht starten. SIP-Port, NAS-IP und Add-on-Protokoll prüfen."
+                self.stop()
+                raise RuntimeError(self.last_error) from None
 
     def stop(self):
         with self.lock:
@@ -53,6 +66,7 @@ class Pbx:
                 except subprocess.TimeoutExpired:
                     self.process.kill()
                     self.process.wait(timeout=3)
+            self.process = None
 
     @staticmethod
     def cli(command):
@@ -80,7 +94,7 @@ class Pbx:
         return {"asterisk_running": running, "provider_registered": selected.get("registered", False),
                 "telekom_registered": selected.get("registered", False), "registration_state": selected.get("state", "deaktiviert"),
                 "phone_registered": phone_ready, "lines": states, "outbound_line": self.settings.value.get("outbound_line", "main"),
-                "media_bridge": False}
+                "media_bridge": False, "startup_error": self.last_error}
 
     @staticmethod
     def _frame(stream):

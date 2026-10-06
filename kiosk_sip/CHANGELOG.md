@@ -1,3 +1,12 @@
+# 26.10.6
+
+- HA-Ingress nutzt den Supervisor-Port statt fest 8099; behebt `Address in use` beim Start im Host-Netzwerk.
+- Bei belegtem SIP-/AMI-Port bleibt die HA-Einrichtung offen und zeigt einen konkreten Hinweis; nach Korrektur ist Speichern erneut möglich.
+- Bei belegtem LAN-Webport bleibt HA-Ingress offen; Gateway-Port in der Add-on-Konfiguration ändern und neu starten.
+- Asterisk gilt erst mit beiden geladenen SIP-Transporten als bereit. Fehlstarts werden aufgeräumt.
+- Regressionsprüfung mit belegten Ports 8099/5070, simuliertem Supervisor, Zugriffsschutz und sauberem Beenden.
+- Anschlussdaten bleiben erhalten. Audio-Bridge zu Kiosk Satellite weiterhin nicht implementiert.
+
 # 26.10.5
 
 - Kontakte als Kiosk-/Raumkarten mit Favoriten und Suche anzeigen.

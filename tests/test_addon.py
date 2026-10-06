@@ -65,9 +65,9 @@ def test_repository_and_addon_metadata():
     assert repository["url"] == "https://github.com/Eibelucas/Kiosk-Satellite-SIP"
     assert addon["arch"] == ["amd64"]
     assert addon["ingress"] and addon["host_network"]
-    assert addon["ingress_port"] == 8099
+    assert addon["ingress_port"] == 0
     assert "image" not in addon  # Local build, no unpublished registry image.
-    assert not addon.get("hassio_api", False)
+    assert addon["hassio_api"] and addon["hassio_role"] == "default"
 
 
 @pytest.mark.parametrize("change", [

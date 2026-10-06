@@ -9,6 +9,7 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 | 3 | [26.10.3](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.3) | Getrennte Rufnummern, normale Hauptrufnummer, Migration |
 | 4 | [26.10.4](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.4) | Separate Durchsage-Nummer, Absenderliste, optionale PIN, einseitiges Audio |
 | 5 | [26.10.5](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.5) | Kontakte als Kiosk-/Raumkarten, Favoriten, Suche und vollständige Anleitung |
+| Korrektur | [26.10.6](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.6) | Dynamischer HA-Ingress-Port und erreichbare Einrichtung bei SIP-/LAN-Portkonflikten |
 
 ## Installieren und aktualisieren
 

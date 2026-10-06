@@ -1,5 +1,5 @@
 name: Kiosk Satellite SIP Gateway
-version: "26.10.5"
+version: "26.10.6"
 slug: kiosk_sip
 description: SIP-Telefonie, mehrere Anbieter/Rufnummern und Durchsagen mit deutschem Onboarding
 url: https://github.com/Eibelucas/Kiosk-Satellite-SIP
@@ -11,7 +11,9 @@ init: true
 stage: experimental
 host_network: true
 ingress: true
-ingress_port: 8099
+ingress_port: 0
+hassio_api: true
+hassio_role: default
 panel_icon: mdi:phone-settings
 panel_title: SIP Telefon
 panel_admin: true
