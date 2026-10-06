@@ -15,7 +15,7 @@ from aiohttp import ClientSession, web
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "kiosk_sip/app"))
 from configuration import Settings, asterisk_files, validate
-from intercom import IntercomBridge, issue_token, packet, read_packet, verify_token, upsample, downsample
+from intercom import incoming_caller_label, IntercomBridge, issue_token, packet, read_packet, verify_token, upsample, downsample
 
 KEY = "fake-intercom-key-not-a-real-secret"
 
@@ -24,6 +24,25 @@ def cfg(**changes):
     return {"enabled": True, "phone_number": "+4900001234567", "listen_address": "10.77.8.20",
             "local_network": "10.77.8.0/24", "phone_password": "fake-phone-secret-123",
             "audio_target": "kiosk", "kiosk_address": "10.77.8.21", "intercom_key": KEY, **changes}
+
+
+@pytest.mark.parametrize("number,presentation,expected", [
+    ("+4900011234567", "allowed", "+4900011234567"),
+    ("000001234567", "allowed_not_screened", "000001234567"),
+    ("1234", "allowed_passed_screen", "1234"),
+    ("+4900011234567", "allowed_failed_screen", "+4900011234567"),
+    *[("+4900011234567", value, "Anonym") for value in
+      ("prohib", "prohib_not_screened", "prohib_passed_screen", "prohib_failed_screen")],
+    ("+4900011234567", "unavailable", "Unbekannter Anrufer"),
+    ("+4900011234567", "", "Unbekannter Anrufer"),
+    ("", "allowed", "Unbekannter Anrufer"),
+    ("anonymous", "allowed", "Unbekannter Anrufer"),
+    ("<script>1234</script>", "allowed", "Unbekannter Anrufer"),
+    ("1234\n5678", "allowed", "Unbekannter Anrufer"),
+    ("1" * 21, "allowed", "Unbekannter Anrufer"),
+])
+def test_incoming_caller_label_respects_presentation_and_validates_number(number, presentation, expected):
+    assert incoming_caller_label({"agi_callerid": number, "agi_arg_3": presentation}) == expected
 
 
 def test_native_configuration_and_secret_lifecycle(tmp_path):
@@ -76,7 +95,7 @@ def test_native_dialplan_preserves_authorization_before_audio_and_normal_ring():
     assert page.index("123456") < page.index("kiosk-native,s,1(page,broadcast)")
     assert page.index("+4900011234567") < page.index("kiosk-native,s,1(page,broadcast)")
     assert "Dial(AudioSocket/127.0.0.1:14002/${KIOSK_UUID}/c(slin)" in dial
-    assert "agi://127.0.0.1:14001" in dial
+    assert "agi://127.0.0.1:14001,${ARG1},${ARG2},${CALLERID(num-pres)}" in dial
     assert KEY not in json.dumps(files)
     assert all(x + ".so" in files["modules.conf"] for x in ("res_agi", "res_audiosocket", "chan_audiosocket", "codec_resample"))
 
@@ -97,7 +116,9 @@ def test_wire_token_matches_dart_signing_and_rejects_replay_wrong_call_sender_ke
         assert not verify_token(KEY, invalid, "test-call", "test-kiosk", {})
 
 
-async def wire_scenario(kind="call", refuse=False, tls=False, advertised=False):
+async def wire_scenario(kind="call", refuse=False, tls=False, advertised=False,
+                        caller="+4900011234567", presentation="allowed",
+                        expected_name="+4900011234567", local=False):
     received = asyncio.Queue()
     accepted = asyncio.Event()
     attached = asyncio.Event()
@@ -112,6 +133,8 @@ async def wire_scenario(kind="call", refuse=False, tls=False, advertised=False):
     async def incoming(request):
         body = await request.json()
         assert body["kind"] == kind
+        if not refuse:
+            assert body["from"]["name"] == expected_name
         assert body["from"]["tls"] is False
         assert verify_token(KEY, request.headers["Authorization"][7:], body["call"], "kiosk-sip-gateway", {})
         async def answer():
@@ -176,10 +199,10 @@ async def wire_scenario(kind="call", refuse=False, tls=False, advertised=False):
             assert not fake_ws
             return
         agi_reader, agi_writer = await asyncio.open_connection("127.0.0.1", bridge.agi_port)
-        line_id = "main"
+        line_id = "local" if local else "main"
         if kind == "broadcast":
             bridge.cfg["lines"][0]["incoming_mode"] = "announcement"
-        agi_writer.write(f"agi_arg_1: {line_id}\nagi_arg_2: {kind}\n\n".encode())
+        agi_writer.write(f"agi_arg_1: {line_id}\nagi_arg_2: {kind}\nagi_callerid: {caller}\nagi_arg_3: {presentation}\n\n".encode())
         await agi_writer.drain()
         if kind == "call":
             with pytest.raises(asyncio.TimeoutError):
@@ -243,3 +266,13 @@ def test_native_audio_uses_advertised_dynamic_listener_instead_of_admin_port():
 @pytest.mark.parametrize("refuse,tls", [(True, False), (False, True)])
 def test_refusal_and_required_tls_never_open_audio(refuse, tls):
     asyncio.run(wire_scenario(refuse=refuse, tls=tls))
+
+
+@pytest.mark.parametrize("presentation,expected", [("prohib_passed_screen", "Anonym"),
+                                                    ("unavailable", "Unbekannter Anrufer")])
+def test_agi_invite_hides_private_or_unavailable_caller(presentation, expected):
+    asyncio.run(wire_scenario(presentation=presentation, expected_name=expected))
+
+
+def test_local_callback_does_not_display_its_internal_caller_id():
+    asyncio.run(wire_scenario(caller="100", expected_name="Lokaler Audio-Test", local=True))

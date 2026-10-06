@@ -18,6 +18,8 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 
 | Telefonansicht | [26.10.11](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.11) | Wähltasten als Standard, weniger Text und direkter Kontakte-Befehl |
 
+| Anruferanzeige | [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Eingehende Nummer am Kiosk, Nummernunterdrückung beachten |
+
 ## Installieren und aktualisieren
 
 Repository-URL für **Kiosk Satellite → Plugin-Manager → Repository hinzufügen**:

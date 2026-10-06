@@ -10,6 +10,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import struct
 import sys
@@ -18,6 +19,21 @@ import time
 import uuid
 
 from aiohttp import ClientSession, ClientTimeout, ClientWSTimeout, WSMsgType, web
+
+
+def incoming_caller_label(env):
+    """Show public channel caller ID only, respecting number presentation.
+
+    Asterisk supplies agi_callerid. The fixed dialplan passes CALLERID(num-pres)
+    as argument 3; private, missing or malformed IDs never become display data.
+    """
+    presentation = env.get("agi_arg_3", "")
+    if presentation in {"prohib", "prohib_not_screened", "prohib_passed_screen", "prohib_failed_screen"}:
+        return "Anonym"
+    number = env.get("agi_callerid", "").strip()
+    if presentation in {"allowed", "allowed_not_screened", "allowed_passed_screen", "allowed_failed_screen"} and re.fullmatch(r"\+?[0-9]{1,20}", number):
+        return number
+    return "Unbekannter Anrufer"
 
 
 def issue_token(key, call, sender="kiosk-sip-gateway"):
@@ -232,7 +248,7 @@ class IntercomBridge:
                 "call": call["id"], "kind": kind,
                 "from": {"id": "kiosk-sip-gateway", "name": label[:80],
                          "address": self.cfg["listen_address"], "port": self.cfg["intercom_port"],
-                         "version": "26.10.11", "tls": False}})
+                         "version": "26.10.12", "tls": False}})
             if code != 200 or reply.get("status") not in {"ringing", "auto", "listening"}:
                 status = reply.get("status")
                 reason = {"busy": "Kiosk ist besetzt.", "dnd": "Kiosk ist auf Nicht stören gestellt.",
@@ -308,7 +324,8 @@ class IntercomBridge:
                 return
             if kind == "broadcast" and (not line or line["incoming_mode"] != "announcement"):
                 return
-            invite = asyncio.create_task(self._invite(kind, line["label"] if line else "Lokaler Audio-Test"))
+            label = incoming_caller_label(env) if line else "Lokaler Audio-Test"
+            invite = asyncio.create_task(self._invite(kind, label))
             gone = asyncio.create_task(reader.readline())
             tasks.extend((invite, gone))
             done, _ = await asyncio.wait({invite, gone}, return_when=asyncio.FIRST_COMPLETED)

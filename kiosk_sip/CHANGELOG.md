@@ -1,3 +1,11 @@
+# 26.10.12
+
+- Eingehende Kiosk-Anrufe zeigen die vom Anbieter übermittelte Anrufernummer statt des SIP-Kontonamens wie „Hauptrufnummer“.
+- Asterisk-Nummernunterdrückung wird beachtet: „Anonym“ bei unterdrückter Nummer, „Unbekannter Anrufer“ bei fehlender oder ungültiger Nummer.
+- Die Nummer wird ausschließlich für die lokale KS-Anrufanzeige verwendet; keine neue Speicherung in Status, Konfiguration oder Protokollen.
+- Tests prüfen die Anzeige über FastAGI und den Intercom-Aufruf sowie mit echtem Asterisk und fiktiven Anruferdaten.
+- Rufnummernkonfiguration, ausgehender Ablauf, Audio und Durchsage-Berechtigungen bleiben unverändert.
+
 # 26.10.11
 
 - Telefonseite ohne Überschrift und Erklärungstext oben; Verbindungsstatus kompakt in der Seitenleiste.

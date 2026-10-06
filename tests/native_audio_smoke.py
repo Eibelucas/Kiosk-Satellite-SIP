@@ -28,6 +28,7 @@ async def main():
     received = asyncio.Queue()
     connected = asyncio.Event()
     fake_ws = []
+    caller_names = asyncio.Queue()
     base = Path(tempfile.mkdtemp(prefix="native-audio-smoke-"))
     base.chmod(0o755)
     user = pwd.getpwnam("asterisk")
@@ -51,6 +52,7 @@ async def main():
     async def incoming(request):
         data = await request.json()
         assert data["kind"] == "call"
+        await caller_names.put(data["from"]["name"])
         assert verify_token(KEY, request.headers["Authorization"][7:], data["call"], "kiosk-sip-gateway", {})
         async def answer():
             await asyncio.sleep(.1)
@@ -97,6 +99,15 @@ async def main():
         for old, sub in (("/run/asterisk", "run"), ("/data/asterisk", "db"),
                          ("/var/spool/asterisk", "spool"), ("/var/log/asterisk", "log")):
             files["asterisk.conf"] = files["asterisk.conf"].replace(old, str(base / sub))
+        # Drive the actual incoming context with fake channel caller ID, never a provider.
+        files["extensions.conf"] += "\n" + "\n".join(
+            f"[cid-{name}]\nexten => s,1,Set(CALLERID(num)={number})\n"
+            f" same => n,Set(CALLERID(num-pres)={presentation})\n"
+            " same => n,Goto(incoming-main,s,1)\n"
+            for name, number, presentation in (
+                ("public", "+4900011234567", "allowed_passed_screen"),
+                ("private", "+4900011234567", "prohib_passed_screen"),
+                ("missing", "", "allowed")))
         files["manager.conf"] = "[general]\nenabled=no\n"
         files["modules.conf"] += "load=res_clioriginate.so\n"
         for name, content in files.items():
@@ -120,6 +131,7 @@ async def main():
         cli("core set verbose 4")
         print(cli("channel originate Local/s@kiosk-native-out/n extension 600@from-phone"))
         await asyncio.wait_for(connected.wait(), 10)
+        assert await asyncio.wait_for(caller_names.get(), 3) == "Lokaler Audio-Test"
         # The WS opens just before AGI returns. Wait until Asterisk attaches.
         for _ in range(100):
             if bridge.active and bridge.active["writer"]:
@@ -150,6 +162,23 @@ async def main():
             await asyncio.sleep(.05)
         assert bridge.active is None
         assert "0 active channels" in cli("core show channels")
+        for context, expected in (("public", "+4900011234567"), ("private", "Anonym"), ("missing", "Unbekannter Anrufer")):
+            connected.clear()
+            cli(f"channel originate Local/s@cid-{context}/n extension 600@from-phone")
+            await asyncio.wait_for(connected.wait(), 10)
+            assert await asyncio.wait_for(caller_names.get(), 3) == expected
+            for _ in range(100):
+                if bridge.active and bridge.active["writer"]:
+                    break
+                await asyncio.sleep(.02)
+            assert bridge.active and bridge.active["writer"]
+            await fake_ws[-1].send_json({"type": "end"})
+            for _ in range(80):
+                if bridge.active is None and "0 active channels" in cli("core show channels"):
+                    break
+                await asyncio.sleep(.05)
+            assert bridge.active is None and "0 active channels" in cli("core show channels")
+        print("PASS: real incoming dialplan forwards public caller number, hides private number and labels missing number; outgoing local callback unchanged.")
         print("PASS: real Asterisk FastAGI -> AudioSocket 8 kHz / KS 16 kHz -> KS WebSocket, microphone tone echoed bidirectionally and hangup leaves no channels.")
     except Exception:
         if bridge:

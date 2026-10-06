@@ -454,7 +454,7 @@ include => from-kiosk-phone
             dial += "Hangup(21)\n"
     dial += "\n[kiosk-auto-answer]\nexten => s,1,Set(PJSIP_HEADER(add,Call-Info)=<sip:kiosk>\\;answer-after=0)\n same => n,Set(PJSIP_HEADER(add,Alert-Info)=<sip:kiosk>\\;info=alert-autoanswer)\n same => n,Return()\n"
     if native:
-        dial += f"\n[kiosk-native]\nexten => s,1,Set(KIOSK_UUID=)\n same => n,AGI(agi://127.0.0.1:{agi_port},${{ARG1}},${{ARG2}})\n same => n,GotoIf($[${{LEN(${{KIOSK_UUID}})}} != 36]?failed)\n same => n,Dial(AudioSocket/127.0.0.1:{audio_port}/${{KIOSK_UUID}}/c(slin),60)\n same => n,Return()\n same => n(failed),Hangup(21)\n\n[kiosk-native-out]\nexten => s,1,Gosub(kiosk-native,s,1(local,call))\n same => n,Hangup()\n"
+        dial += f"\n[kiosk-native]\nexten => s,1,Set(KIOSK_UUID=)\n same => n,AGI(agi://127.0.0.1:{agi_port},${{ARG1}},${{ARG2}},${{CALLERID(num-pres)}})\n same => n,GotoIf($[${{LEN(${{KIOSK_UUID}})}} != 36]?failed)\n same => n,Dial(AudioSocket/127.0.0.1:{audio_port}/${{KIOSK_UUID}}/c(slin),60)\n same => n,Return()\n same => n(failed),Hangup(21)\n\n[kiosk-native-out]\nexten => s,1,Gosub(kiosk-native,s,1(local,call))\n same => n,Hangup()\n"
     account = resolve(selected) if selected else None
     return {
         "pjsip.conf": pjsip, "extensions.conf": dial,
