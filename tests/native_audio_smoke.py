@@ -98,6 +98,7 @@ async def main():
                          ("/var/spool/asterisk", "spool"), ("/var/log/asterisk", "log")):
             files["asterisk.conf"] = files["asterisk.conf"].replace(old, str(base / sub))
         files["manager.conf"] = "[general]\nenabled=no\n"
+        files["modules.conf"] += "load=res_clioriginate.so\n"
         for name, content in files.items():
             path = base / "config" / name
             path.write_text(content)
@@ -116,7 +117,8 @@ async def main():
             await asyncio.sleep(.1)
         for module in ("res_agi.so", "res_audiosocket.so", "chan_audiosocket.so", "codec_resample.so"):
             assert module in cli("module show like " + module), module
-        cli("channel originate Local/s@kiosk-native-out/n extension 600@from-phone")
+        cli("core set verbose 4")
+        print(cli("channel originate Local/s@kiosk-native-out/n extension 600@from-phone"))
         await asyncio.wait_for(connected.wait(), 10)
         # The WS opens just before AGI returns. Wait until Asterisk attaches.
         for _ in range(100):
@@ -150,6 +152,8 @@ async def main():
         assert "0 active channels" in cli("core show channels")
         print("PASS: real Asterisk FastAGI -> AudioSocket 8 kHz / KS 16 kHz -> KS WebSocket, microphone tone echoed bidirectionally and hangup leaves no channels.")
     except Exception:
+        if bridge:
+            print("Bridge diagnostic:", bridge.status())
         if 'log' in locals():
             log.flush()
             log.seek(0)
