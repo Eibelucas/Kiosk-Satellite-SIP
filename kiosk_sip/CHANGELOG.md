@@ -1,3 +1,12 @@
+# 26.10.10
+
+- Einrichtung nutzt breite Bildschirme: Formular und Verbindungsstatus stehen nebeneinander, zusammengehörige Felder in zwei Spalten.
+- Telefonseite mit kompakter Seitenleiste, mehreren Kontaktspalten und einem platzsparenden Wählfeld mit großen Tasten.
+- Auf schmalen Displays stehen die Bereiche untereinander; lange Status- und Kontakttexte können umbrechen.
+- Weiterführende Testhinweise lassen sich aufklappen. Kiosk-Echo-Test und Verbindungsprüfung bleiben direkt erreichbar.
+- Anleitung für Kiosk-Audio und sichere lokale Echo-Tests korrigiert. Keine Änderung an SIP-/Audio-Abläufen oder gespeicherten Einstellungen.
+- Isolierter SIP-Test registriert seine drei simulierten Konten mit kurzer Staffelung und Wiederholungszeit, um gleichzeitige Transaktionskonflikte zu vermeiden. Produktionszeiten bleiben unverändert.
+
 # 26.10.9
 
 - Audio-Ziel Kiosk Satellite Intercom: Asterisk-20-AudioSocket mit 8-kHz-PCM, Umwandlung auf 16 kHz und nativer Intercom-WebSocket-Verbindung.

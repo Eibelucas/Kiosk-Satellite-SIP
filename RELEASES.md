@@ -11,10 +11,10 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 | 5 | [26.10.5](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.5) | Kontakte als Kiosk-/Raumkarten, Favoriten, Suche und vollständige Anleitung |
 | Korrektur | [26.10.6](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.6) | Dynamischer HA-Ingress-Port und erreichbare Einrichtung bei SIP-/LAN-Portkonflikten |
 | Bereinigung | [26.10.7](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.7) | Allgemeine Dokumentation und neutrale Beispiele |
-
 | Korrektur | [26.10.8](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.8) | Präzise Heimnetz-Prüfung und kein vorbelegtes Beispielnetz |
-
 | Audio | [26.10.9](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.9) | Native Intercom-Audio-Brücke für ein Kiosk-Gerät, normales Klingeln, einseitige Durchsage und Echo-Test |
+
+| Oberfläche | [26.10.10](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.10) | Responsive Einrichtung und Telefonseite, weniger Leerraum und kompaktere Übersicht |
 
 ## Installieren und aktualisieren
 

@@ -92,7 +92,10 @@ def main():
     files = asterisk_files(cfg, "fake-ami-secret")
     # The tiny fake phone has no background OPTIONS handler while waiting for
     # provider registrations; disable qualification for this test phone only.
-    files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0').replace('expiration=600','expiration=600\nmax_random_initial_delay=0')
+    # Avoid forcing all registrations into one simultaneous transaction burst.
+    # Short retries are only for this isolated loopback simulator. Still require
+    # all three real registrations; production registration timings stay intact.
+    files['pjsip.conf'] = files['pjsip.conf'].replace('qualify_frequency=30','qualify_frequency=0').replace('expiration=600','expiration=600\nmax_random_initial_delay=1').replace('retry_interval=60','retry_interval=1')
     # Independent config/control socket/database; do not stop the running add-on.
     files['resolver_unbound.conf']='[general]\nresolv=\nhosts=\nnameserver=127.0.0.1@15353\n'
     # identify.match uses the platform resolver independently of the outbound

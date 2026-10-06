@@ -1,5 +1,5 @@
 name: Kiosk Satellite SIP Gateway
-version: "26.10.9"
+version: "26.10.10"
 slug: kiosk_sip
 description: SIP-Telefonie, mehrere Anbieter/Rufnummern und Durchsagen mit deutschem Onboarding
 url: https://github.com/Eibelucas/Kiosk-Satellite-SIP

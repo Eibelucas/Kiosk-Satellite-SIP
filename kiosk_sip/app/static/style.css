@@ -2,3 +2,65 @@
 .contact-editor{border:1px solid var(--line);border-radius:16px;padding:18px;margin:18px 0}.contact-editor legend{color:var(--accent);padding:0 8px}.contact{align-items:center;justify-content:flex-start;padding:20px}.contact-icon{display:grid;place-items:center;width:50px;height:50px;border-radius:14px;background:#29323b;font-size:25px;flex-shrink:0}.kiosk-card .contact-icon{background:#163f2c;color:var(--accent)}.contact-details{display:grid;gap:2px;flex:1}.contact-name{font-weight:700;font-size:19px}.contact-kind,.contact-number{font-size:13px;color:var(--muted)}.contact .favorite{color:var(--accent)}button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 
 .contact-name{color:var(--text)}
+
+/* Use the landscape space; narrow screens retain a single reading column. */
+main{max-width:1600px;padding:24px clamp(16px,3vw,40px) 36px;min-width:0}
+main.narrow{max-width:480px;padding-top:12vh}
+header>div,.grid>*,.phone-layout>*,.setup-page>*,.contact-details{min-width:0}
+header{flex-wrap:wrap;gap:12px}
+header p{margin:8px 0}
+.notice{margin:18px 0;padding:12px 16px}
+.card{padding:22px}
+label{margin:12px 0}
+.grid{gap:0 20px}
+.actions,.section-header{flex-wrap:wrap}
+.section-header h2{margin:0}
+.status-list{margin:14px 0}
+.status-list li{padding:7px 0;overflow-wrap:anywhere}
+.hint{margin-top:4px}
+.summary{grid-template-columns:minmax(130px,.65fr) minmax(0,1fr);gap:8px 18px;margin:0 0 18px}
+.summary dd,.summary code{overflow-wrap:anywhere}
+.steps{margin:20px 0}
+.setup-page .wizard-step{margin-top:0}
+.setup-page #diagnostics .actions{display:grid;gap:10px}
+.setup-page #diagnostics .actions button{width:100%;text-align:left}
+.connection-guide{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
+.contact-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;min-width:0}
+.contact-editor>button{align-self:center;justify-self:start}
+.phone{max-width:1600px}
+.phone-layout{display:grid;grid-template-columns:minmax(230px,300px) minmax(0,1fr);gap:24px;align-items:start}
+.phone-controls{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 18px 12px}
+.phone-controls .tabs{display:grid;grid-template-columns:1fr;gap:8px;margin:16px 0}
+.phone-controls .tabs button{text-align:left;min-height:44px}
+.phone .contacts{grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));align-items:start;gap:14px}
+.phone .contact{padding:16px;min-height:100px;overflow-wrap:anywhere}
+.phone .contact-icon{width:44px;height:44px}
+.phone .contact-name{font-size:18px}
+.phone .contact-number{overflow-wrap:anywhere}
+.phone #dialerPanel{width:100%;max-width:640px;justify-self:center}
+.phone .number{margin-top:0;font-size:clamp(24px,3vw,32px)}
+.phone .dialpad{max-width:none;gap:10px;margin:14px 0}
+.phone .dialpad button{min-height:60px;font-size:26px;padding:9px}
+.phone #message{margin:14px 0 0}
+@media(min-width:1100px){
+  .setup-page{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,400px);gap:18px 24px;align-items:start}
+  .setup-page>header,.setup-page>.notice,.setup-page>.steps{grid-column:1/-1;margin:0}
+  .setup-page>#setupForm{grid-column:1}
+  .setup-page>#diagnostics{grid-column:2;grid-row:4;margin:0}
+}
+@media(max-width:800px){
+  .phone-layout{grid-template-columns:1fr;gap:18px}
+  .phone-controls .tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .phone-controls .tabs button{text-align:center;font-size:14px;padding:10px 4px}
+}
+@media(max-width:600px){
+  main{padding:20px 16px 28px}
+  .card{padding:18px}
+  .grid,.contact-editor{grid-template-columns:1fr}
+  .steps{gap:6px;font-size:12px}
+  .steps span{overflow-wrap:anywhere}
+  .summary{grid-template-columns:1fr;gap:3px}
+  .summary dd{margin-bottom:10px}
+  .phone .dialpad button{min-height:56px;font-size:24px}
+  .phone .contacts{gap:10px}
+}
