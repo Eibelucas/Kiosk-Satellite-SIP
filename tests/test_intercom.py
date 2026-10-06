@@ -41,6 +41,14 @@ def test_native_configuration_and_secret_lifecycle(tmp_path):
     assert settings.value["intercom_key"] == "fake-new-intercom-key"
 
 
+def test_native_audio_does_not_require_an_unused_sip_phone_password():
+    value = validate(cfg(phone_password=""))
+    assert value["phone_password"] == ""
+    assert "[phone-auth]" not in asterisk_files(value, "fake-ami", (14001, 14002))["pjsip.conf"]
+    with pytest.raises(ValueError, match="SIP-Telefon-Passwort"):
+        validate({"audio_target": "sip"}, value)
+
+
 @pytest.mark.parametrize("changes", [
     {"kiosk_address": "8.8.8.8"}, {"kiosk_address": "10.77.9.21"},
     {"kiosk_address": "10.77.8.20"}, {"kiosk_address": "10.77.8.255"},

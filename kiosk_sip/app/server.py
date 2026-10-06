@@ -122,7 +122,7 @@ def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
 
     @app.get("/")
     def index():
-        if ingress() and not settings.value["phone_password"]:
+        if ingress() and not (settings.value["phone_password"] or (settings.value.get("audio_target") == "kiosk" and settings.value.get("intercom_key"))):
             return redirect("setup")
         return render_template("phone.html")
 
@@ -156,7 +156,7 @@ def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
 
     @app.get("/api/status")
     def status():
-        return jsonify(ok=True, **pbx.status(), configured=bool(settings.value["phone_password"]),
+        return jsonify(ok=True, **pbx.status(), configured=bool(settings.value["phone_password"] or (settings.value.get("audio_target") == "kiosk" and settings.value.get("intercom_key"))),
                        enabled=settings.value["enabled"], lan_enabled=settings.value["lan_enabled"],
                        lan_error=app.config.get("LAN_ERROR", ""))
 

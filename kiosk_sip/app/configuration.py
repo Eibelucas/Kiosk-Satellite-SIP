@@ -235,7 +235,8 @@ def validate(body, previous=None):
     value = body.get("phone_password")
     if value is not None and value != "":
         cfg["phone_password"] = secret_value(value, "SIP-Telefon-Passwort", 12)
-    secret_value(cfg["phone_password"], "SIP-Telefon-Passwort", 12)
+    if cfg["audio_target"] == "sip" or cfg["phone_password"]:
+        secret_value(cfg["phone_password"], "SIP-Telefon-Passwort", 12)
     if not isinstance(cfg["web_username"], str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,40}", cfg["web_username"]):
         raise ValueError("Kiosk-Benutzername: nur Buchstaben, Ziffern, Unterstrich und Bindestrich.")
     password = body.get("web_password", "")
