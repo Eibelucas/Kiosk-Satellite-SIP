@@ -85,6 +85,42 @@ def test_reject_invalid_and_injected_configuration(change):
         validate(valid(**change))
 
 
+@pytest.mark.parametrize("address,network", [
+    ("10.77.8.20", "10.77.8.0/24"),
+    ("172.20.8.20", "172.20.8.0/24"),
+    ("192.168.88.20", "192.168.88.0/24"),
+])
+def test_private_address_accepted_in_its_actual_subnet(address, network):
+    cfg = validate(valid(listen_address=address, local_network=network))
+    assert cfg["listen_address"] == address
+    assert cfg["local_network"] == network
+
+
+def test_private_address_in_other_subnet_gets_network_correction_hint(instance):
+    settings, pbx, app = instance
+    previous = settings.path.read_bytes()
+    client = app.test_client()
+    response = trusted(client, "POST", "/api/setup",
+                       headers={"X-CSRF-Token": token(client)},
+                       json=valid(listen_address="10.77.8.20"))
+    assert response.status_code == 400
+    assert "NAS-IP ist privat" in response.json["error"]
+    assert "Heimnetz mit Netzmaske" in response.json["error"]
+    assert settings.path.read_bytes() == previous
+    assert pbx.restarts == 0
+
+
+@pytest.mark.parametrize("changes,hint", [
+    ({"listen_address": "8.8.8.8"}, "NAS-Adresse: eine private"),
+    ({"local_network": "0.0.0.0/0"}, "Heimnetz mit Netzmaske: ein privates"),
+    ({"listen_address": "10.99.0.0"}, "Netz- oder Broadcast-Adresse"),
+    ({"listen_address": "10.99.0.255"}, "Netz- oder Broadcast-Adresse"),
+])
+def test_network_errors_identify_the_actual_invalid_field(changes, hint):
+    with pytest.raises(ValueError, match=hint):
+        validate(valid(**changes))
+
+
 def test_secrets_preserved_redacted_and_permissions(tmp_path):
     settings = Settings(tmp_path)
     settings.save(valid(auth_mode="password", auth_username="fake@t-online.de", auth_password="fake-telekom-secret"))

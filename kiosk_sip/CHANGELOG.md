@@ -1,3 +1,10 @@
+# 26.10.8
+
+- Unterscheidet private Geräte-IP, falsches Heimnetz und unzulässige Netz-/Broadcast-Adressen in der Fehlermeldung.
+- Bei der Ersteinrichtung ist kein Beispielnetz mehr vorbelegt; das eigene Netz muss ausdrücklich eingetragen werden.
+- Die Zusammenfassung zeigt das eingetragene Heimnetz mit Netzmaske.
+- Bestehende lokale Konfigurationen und SIP-Funktionen bleiben erhalten.
+
 # 26.10.7
 
 - Allgemeine HAOS-Anleitung ohne persönliche Hardwarebezüge.
