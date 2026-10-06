@@ -8,7 +8,9 @@ Für **HAOS auf einem unterstützten amd64-System** gibt es jetzt ein gemeinsame
 2. `https://github.com/Eibelucas/Kiosk-Satellite-SIP` hinzufügen.
 3. **Kiosk Satellite SIP Gateway** installieren und starten.
 4. **Weboberfläche öffnen** und die vier Einrichtungsschritte durchgehen.
-5. Anschließend das Add-on neu starten, ein SIP-Telefon als Nebenstelle **100** anmelden und im Kiosk-Plugin die angezeigte **Gateway URL** setzen.
+5. Das gewählte Audio-Ziel einrichten: für **Kiosk Satellite Intercom** Kiosk-IP, Identitätsport und gemeinsamen Intercom-Schlüssel hinterlegen; für **SIP-Telefon 100** das SIP-Telefon anmelden. Im Kiosk-Plugin die angezeigte **Gateway URL** setzen. Kiosk-Audio benötigt keine zusätzliche Anmeldung von Telefon 100.
+
+Für den ersten Audio-Test den **lokalen Kiosk-Echo-Test** im HA-Assistenten verwenden. **600 im normalen Anrufpad ist kein sicherer lokaler Test:** Das Anrufpad verwendet den ausgehenden Anbieter-Kontext.
 
 **[Vollständige Anleitung: Anbieter, mehrere Rufnummern und Durchsagen](kiosk_sip/DOCS.md)**. Sie steht auch im Dokumentations-Tab des Add-ons.
 

@@ -151,13 +151,15 @@ Die Home-Assistant-Ingress-URL gehört nicht in die Plugin-Einstellung. Verwende
 
 1. Eine eigene Testnummer auswählen/eingeben.
 2. **Anrufen** drücken und die Rückruf-Anfrage bestätigen.
-3. Dein SIP-Telefon **100 klingelt zuerst**.
-4. Auf Telefon 100 annehmen. Erst danach wählt Asterisk die externe Zielnummer über Telekom.
-5. Zum Beenden auf dem SIP-Telefon auflegen.
+3. Das gewählte Audio-Ziel klingelt zuerst: bei **Kiosk Satellite Intercom** der konfigurierte Kiosk, bei **SIP-Telefon 100** das angemeldete SIP-Telefon.
+4. Dort annehmen. Erst danach wählt Asterisk die externe Zielnummer über die ausgewählte normale Anbieter-Rufnummer. Kiosk-Audio benötigt keine Anmeldung von Telefon 100.
+5. Zum Beenden am Kiosk bzw. SIP-Telefon auflegen.
 
-Die Weboberfläche meldet die Annahme einer Rückruf-Anfrage, nicht das erfolgreiche Zustandekommen des externen Gesprächs. Es gibt derzeit weder Kiosk-Audio, DTMF-Tasten während eines Gesprächs noch einen Auflegen-Button im Gateway.
+Die Weboberfläche meldet die Annahme einer Rückruf-Anfrage, nicht das erfolgreiche Zustandekommen des externen Gesprächs. Der Bestätigungsdialog ist ein nativer Browser-/WebView-Dialog mit **OK** und **Abbrechen**. Abbrechen startet keine Anfrage; OK fordert zunächst den Rückruf auf das gewählte Audio-Ziel an. Solange der Dialog offen ist, wird keine Anruf-Anfrage gesendet. Die Anzeige auf dem eigenen Android-Kiosk muss vor Ort geprüft werden. DTMF-Tasten während eines Gesprächs und ein Auflegen-Button im Gateway sind derzeit nicht enthalten.
 
-Eingehende Telekom-Anrufe werden auf SIP-Telefon 100 weitergeleitet. Voraussetzung: Telekom-Registrierung, korrekte Zuordnung des eingehenden SIP-Servers und funktionierende Netzwerk-/Audio-Verbindung. Sie klingeln noch nicht über die Intercom-Funktion im Kiosk. Es werden keine automatischen Testanrufe ausgelöst.
+**Lokaler Test:** Für Kiosk-Audio ausschließlich **Lokalen Kiosk-Echo-Test starten** im HA-Assistenten verwenden. Dieser eigene API-Pfad wählt 600 im lokalen Echo-Kontext. **600 in das normale Anrufpad einzugeben ist kein lokaler Echo-Test:** `api/call` verwendet den Anbieter-Kontext und kann die Nummer über den Anbieter wählen. Der erste echte Telefon-Test sollte bewusst eine eigene, freigegebene Zielnummer verwenden.
+
+Normale eingehende Anbieter-Anrufe klingeln am gewählten Audio-Ziel. Voraussetzung: Anbieter-Registrierung, korrekte Zuordnung der eingehenden Rufnummer und funktionierende Netzwerk-/Audio-Verbindung. Separate Durchsage-Rufnummern behalten ihre Absenderliste/PIN und das Dauerlimit. Es werden keine automatischen Testanrufe ausgelöst.
 
 ## Fehler beheben
 
@@ -171,6 +173,7 @@ Eingehende Telekom-Anrufe werden auf SIP-Telefon 100 weitergeleitet. Voraussetzu
 | Telekom: wartet | DNS, Internetzugang und SIP-Verkehr am Router prüfen. Beim Verbindungsaufbau kurz warten, dann Status aktualisieren. |
 | Private NAS-IP wird beim Speichern abgelehnt | Unter Heimnetz mit Netzmaske das tatsächliche lokale Netz eintragen. Eine private IP allein genügt nicht: Sie muss in diesem Netz liegen. Die Netzmaske in HA oder am Router prüfen; /24 entspricht 255.255.255.0. |
 | Telefon 100 fehlt | NAS-IP, Port, UDP, Benutzer `100` und dessen eigenes Passwort prüfen. Beide Geräte müssen im angegebenen Heimnetz liegen. |
+| Anrufen-Taste deaktiviert | Die ausgewählte ausgehende Rufnummer muss aktiviert, normal und beim Anbieter registriert sein. Unter Telefon das gewünschte Audio-Ziel prüfen: Kiosk Satellite Intercom braucht eine gestartete Audio-Brücke; SIP-Telefon 100 braucht ein angemeldetes SIP-Telefon. Für Kiosk-Audio ist Telefon 100 nicht erforderlich. Bei leerer Zielnummer wird keine Anfrage ausgelöst. |
 | Echo-Test ohne Ton | Zuerst WLAN-Isolation, lokale Firewall und UDP/RTP prüfen; Telekom ist am lokalen Echo-Test nicht beteiligt. |
 | Lokaler Ton funktioniert, extern kein/einseitiger Ton | NAT prüfen. Asterisk verwendet UDP `30000–30100` für RTP; Heimnetz und ggf. öffentliche IPv4 korrekt setzen. STUN ist ein Hilfsmittel, kein Ersatz für passende NAT-Regeln. |
 | Kiosk-Seite unerreichbar | LAN-Zugriff aktivieren, Kiosk-Passwort setzen, Add-on neu starten, NAS-IP/Port prüfen. |
