@@ -186,6 +186,22 @@ def test_ingress_relative_assets_and_csrf(instance):
     page = trusted(client, "GET", "/setup")
     assert 'src="static/setup.js"' in page.text
     assert 'href="static/style.css"' in page.text
+
+
+def test_native_audio_echo_api_requires_csrf_and_uses_only_local_echo(instance):
+    _, pbx, app = instance
+    pbx.state.update(media_bridge=True, audio_target="kiosk", phone_registered=False)
+    selected = []
+    def originate(number, line_id=None, local_test=False):
+        selected.append((number, local_test))
+        return {"message": "local echo"}
+    pbx.originate = originate
+    client = app.test_client()
+    assert trusted(client, "POST", "/api/intercom/test").status_code == 403
+    response = trusted(client, "POST", "/api/intercom/test", headers={"X-CSRF-Token": token(client)},
+                       json={"number": "+4900007654321"})
+    assert response.status_code == 200
+    assert selected == [("600", True)]
     assert trusted(client, "POST", "/api/setup", json=valid()).status_code == 403
     assert trusted(client, "POST", "/api/setup", json=[], headers={"X-CSRF-Token": token(client)}).status_code == 400
 

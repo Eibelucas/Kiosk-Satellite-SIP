@@ -139,6 +139,8 @@ class Pbx:
         raise RuntimeError("Ungültige AMI-Antwort.")
 
     def originate(self, number, line_id=None, local_test=False):
+        if local_test and number != "600":
+            raise ValueError("Der lokale Audio-Test darf nur Echo 600 wählen.")
         line_id = line_id or self.settings.value.get("outbound_line", "main")
         line = next((line for line in effective_lines(self.settings.value) if line["id"] == line_id), None)
         if not isinstance(number, str) or not DESTINATION.fullmatch(number) or not line or not line["enabled"] or line["incoming_mode"] != "normal":

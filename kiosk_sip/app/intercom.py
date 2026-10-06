@@ -373,7 +373,7 @@ class IntercomBridge:
         pending = bytearray()
         previous = 0
         while True:
-            kind, data = await asyncio.wait_for(read_packet(reader), 15)
+            kind, data = await read_packet(reader)
             if kind == 0:
                 return
             if kind == 3:  # DTMF is not PCM; don't feed it to the speaker.
