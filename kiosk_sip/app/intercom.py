@@ -232,7 +232,7 @@ class IntercomBridge:
                 "call": call["id"], "kind": kind,
                 "from": {"id": "kiosk-sip-gateway", "name": label[:80],
                          "address": self.cfg["listen_address"], "port": self.cfg["intercom_port"],
-                         "version": "26.10.10", "tls": False}})
+                         "version": "26.10.11", "tls": False}})
             if code != 200 or reply.get("status") not in {"ringing", "auto", "listening"}:
                 status = reply.get("status")
                 reason = {"busy": "Kiosk ist besetzt.", "dnd": "Kiosk ist auf Nicht stören gestellt.",

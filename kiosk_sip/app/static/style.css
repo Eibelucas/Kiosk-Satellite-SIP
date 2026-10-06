@@ -64,3 +64,6 @@ label{margin:12px 0}
   .phone .dialpad button{min-height:56px;font-size:24px}
   .phone .contacts{gap:10px}
 }
+
+.phone-state{margin:12px 0;font-size:13px;overflow-wrap:anywhere}
+.phone-controls>a.button{margin-bottom:6px}

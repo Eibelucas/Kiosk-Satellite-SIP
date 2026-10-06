@@ -23,6 +23,8 @@ jobs:
         run: |
           node --check kiosk_sip/app/static/setup.js
           node --check kiosk_sip/app/static/phone.js
+      - name: Phone view and quick-access regression
+        run: node tests/phone_ui.cjs
       - name: Build amd64 add-on
         run: docker build -t kiosk-sip-test kiosk_sip
       - name: Host-network port conflict and assigned ingress regression

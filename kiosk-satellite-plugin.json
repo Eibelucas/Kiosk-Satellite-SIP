@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "kiosk-satellite-sip",
   "name": "Kiosk Satellite SIP",
-  "version": "26.10.10",
+  "version": "26.10.11",
   "minAndroidSdk": 24,
   "entryClass": "de.eibelucas.kiosksip.KioskSipPlugin",
   "description": "Telefonseite mit Kontakten, Kiosk-Karten und Anrufpad für den konfigurierten SIP-Gateway.",
@@ -16,7 +16,7 @@
     {
       "key": "gatewayUrl",
       "title": "Gateway URL",
-      "description": "HTTP or HTTPS URL of the Kiosk Satellite SIP gateway, for example http://192.168.1.20:8088/",
+      "description": "Lokale HTTP- oder HTTPS-Adresse des Telefon-Gateways aus dem HA-Assistenten.",
       "type": "string",
       "default": "http://homeassistant.local:8088/",
       "group": "Telefon"
@@ -26,6 +26,10 @@
     {
       "id": "openPhone",
       "title": "Telefon öffnen"
+    },
+    {
+      "id": "openContacts",
+      "title": "Kontakte öffnen"
     }
   ]
 }

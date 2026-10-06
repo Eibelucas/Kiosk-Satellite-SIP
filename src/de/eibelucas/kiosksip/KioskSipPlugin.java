@@ -25,11 +25,13 @@ public final class KioskSipPlugin implements KioskPlugin {
 
     @Override
     public void execute(String command, Map<String, Object> arguments) {
-        if (!"openPhone".equals(command)) {
+        if (!"openPhone".equals(command) && !"openContacts".equals(command)) {
             throw new IllegalArgumentException("Unknown command: " + command);
         }
         Map<String, Object> args = new HashMap<>();
-        args.put("url", gatewayUrl);
+        int fragment = gatewayUrl.indexOf('#');
+        String pageUrl = fragment < 0 ? gatewayUrl : gatewayUrl.substring(0, fragment);
+        args.put("url", pageUrl + ("openContacts".equals(command) ? "#contacts" : "#dialer"));
         host.executeCommand("showLinkPage", args, (ok, data, error) -> {
             if (!ok) host.status(error == null ? "Telefonseite konnte nicht geöffnet werden" : error, true);
         });

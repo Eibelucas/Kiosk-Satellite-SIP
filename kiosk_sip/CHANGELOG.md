@@ -1,3 +1,12 @@
+# 26.10.11
+
+- Telefonseite ohne Überschrift und Erklärungstext oben; Verbindungsstatus kompakt in der Seitenleiste.
+- Wähltasten als Standardansicht, bereits vor dem Laden der Kontakte. Das Laden wechselt eine inzwischen gewählte Ansicht nicht zurück.
+- Neuer Plugin-Befehl „Kontakte öffnen“ als direkter Zugriff auf die bestehenden Kontakte und Favoriten.
+- Telefonnummern werden durch Auswahl eines Kontakts nur vorbereitet; „Anrufen“ und Bestätigung bleiben erforderlich.
+- Die native KS-Gegensprechliste wird nicht erweitert: SDK 1 bietet keine Telefonkontakt- oder Schnellwahl-Schnittstelle. Eine native Integration benötigt eine Erweiterung von Kiosk Satellite.
+- Gespeicherte Kontakte, Rufnummern, Einstellungen und SIP-/Audio-Abläufe bleiben erhalten.
+
 # 26.10.10
 
 - Einrichtung nutzt breite Bildschirme: Formular und Verbindungsstatus stehen nebeneinander, zusammengehörige Felder in zwei Spalten.
