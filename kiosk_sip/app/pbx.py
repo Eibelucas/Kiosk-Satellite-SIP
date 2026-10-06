@@ -10,6 +10,7 @@ from pathlib import Path
 
 from configuration import asterisk_files, effective_lines, DESTINATION
 from networking import PortConflict, check_port
+from intercom import IntercomBridge
 
 
 class Pbx:
@@ -18,6 +19,7 @@ class Pbx:
         self.process = None
         self.lock = threading.RLock()
         self.last_error = ""
+        self.bridge = None
 
     def write_config(self):
         import pwd
@@ -26,7 +28,8 @@ class Pbx:
         for directory in ("/run/asterisk", "/var/log/asterisk", "/var/spool/asterisk", str(self.settings.directory / "asterisk")):
             Path(directory).mkdir(parents=True, exist_ok=True)
             os.chown(directory, uid, gid)
-        for filename, text in asterisk_files(self.settings.value, self.settings.ami_secret).items():
+        ports = (self.bridge.agi_port, self.bridge.audio_port) if self.bridge else None
+        for filename, text in asterisk_files(self.settings.value, self.settings.ami_secret, ports).items():
             path = Path("/etc/asterisk") / filename
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
@@ -42,6 +45,9 @@ class Pbx:
                 for protocol in ("UDP", "TCP"):
                     check_port(cfg["listen_address"], cfg["sip_port"], protocol, "SIP")
                 check_port("127.0.0.1", 5038, "TCP", "AMI")
+                if cfg.get("audio_target") == "kiosk":
+                    self.bridge = IntercomBridge(cfg)
+                    self.bridge.start()
                 self.write_config()
                 self.process = subprocess.Popen(["asterisk", "-f", "-C", "/etc/asterisk/asterisk.conf", "-U", "asterisk", "-G", "asterisk"])
                 for _ in range(40):
@@ -49,11 +55,13 @@ class Pbx:
                         raise RuntimeError("Asterisk konnte nicht starten. Add-on-Protokoll prüfen.")
                     transports = self.cli("pjsip show transports")
                     if "System uptime" in self.cli("core show uptime") and all(name in transports for name in ("transport-udp", "transport-tcp")):
+                        if self.bridge and any(module not in self.cli("module show like " + module) for module in ("res_agi.so", "res_audiosocket.so", "chan_audiosocket.so", "codec_resample.so")):
+                            raise RuntimeError("Asterisk-Audio-Module fehlen.")
                         return
                     time.sleep(0.25)
                 raise RuntimeError("Asterisk/SIP-Transport konnte nicht starten. SIP-Port, NAS-IP und Add-on-Protokoll prüfen.")
             except (OSError, RuntimeError) as exc:
-                self.last_error = str(exc) if isinstance(exc, PortConflict) else "Asterisk/SIP-Transport konnte nicht starten. SIP-Port, NAS-IP und Add-on-Protokoll prüfen."
+                self.last_error = str(exc) if isinstance(exc, PortConflict) or (self.bridge and self.bridge.start_error) else "Asterisk/SIP-Transport konnte nicht starten. SIP-Port, NAS-IP und Add-on-Protokoll prüfen."
                 self.stop()
                 raise RuntimeError(self.last_error) from None
 
@@ -67,6 +75,9 @@ class Pbx:
                     self.process.kill()
                     self.process.wait(timeout=3)
             self.process = None
+            if self.bridge:
+                self.bridge.stop()
+                self.bridge = None
 
     @staticmethod
     def cli(command):
@@ -94,7 +105,23 @@ class Pbx:
         return {"asterisk_running": running, "provider_registered": selected.get("registered", False),
                 "telekom_registered": selected.get("registered", False), "registration_state": selected.get("state", "deaktiviert"),
                 "phone_registered": phone_ready, "lines": states, "outbound_line": self.settings.value.get("outbound_line", "main"),
-                "media_bridge": False, "startup_error": self.last_error}
+                "audio_target": self.settings.value.get("audio_target", "sip"),
+                "media_bridge": self.bridge is not None,
+                "intercom": self.bridge.status() if self.bridge else None,
+                "startup_error": self.last_error}
+
+    def probe_intercom(self):
+        import asyncio
+        if not self.bridge or not self.bridge.loop or not self.bridge.loop.is_running():
+            raise RuntimeError("Kiosk-Audio zuerst einrichten, speichern und das Add-on neu starten.")
+        future = asyncio.run_coroutine_threadsafe(self.bridge._probe(), self.bridge.loop)
+        try:
+            identity = future.result(timeout=6)
+            return {"message": "Kiosk erreichbar, Intercom aktiviert und Schlüssel stimmt.",
+                    "name": identity.get("name", "Kiosk")}
+        except Exception:
+            future.cancel()
+            raise RuntimeError("Kiosk nicht bereit. Intercom-IP/Port, Schlüssel, Nicht stören und TLS-Einstellung am Kiosk prüfen.") from None
 
     @staticmethod
     def _frame(stream):
@@ -111,7 +138,7 @@ class Pbx:
                 fields[key.strip()] = value.strip()
         raise RuntimeError("Ungültige AMI-Antwort.")
 
-    def originate(self, number, line_id=None):
+    def originate(self, number, line_id=None, local_test=False):
         line_id = line_id or self.settings.value.get("outbound_line", "main")
         line = next((line for line in effective_lines(self.settings.value) if line["id"] == line_id), None)
         if not isinstance(number, str) or not DESTINATION.fullmatch(number) or not line or not line["enabled"] or line["incoming_mode"] != "normal":
@@ -128,9 +155,12 @@ class Pbx:
                 login = action({"Action": "Login", "Username": "kioskphone", "Secret": self.settings.ami_secret, "Events": "off"})
                 if login.get("Response") != "Success":
                     raise RuntimeError("Lokale Asterisk-Anmeldung fehlgeschlagen.")
-                response = action({"Action": "Originate", "Channel": "PJSIP/100", "Context": "from-out-" + line_id,
+                native = self.settings.value.get("audio_target") == "kiosk" and self.bridge is not None
+                response = action({"Action": "Originate", "Channel": "Local/s@kiosk-native-out/n" if native else "PJSIP/100", "Context": "from-phone" if local_test else "from-out-" + line_id,
                                    "Exten": number, "Priority": "1", "Timeout": "30000", "Async": "true",
                                    "CallerID": "Kiosk Satellite <100>", "ActionID": str(uuid.uuid4())})
                 if response.get("Response") != "Success":
                     raise RuntimeError("Asterisk hat den Rückruf abgelehnt.")
-                return {"message": "Rückruf angefordert. Nimm dein SIP-Telefon 100 an; danach wird die Zielnummer gewählt."}
+                return {"message": "Kiosk wird angerufen. Am Kiosk annehmen; danach startet der lokale Echo-Test." if native and local_test else
+                        "Kiosk wird angerufen. Am Kiosk annehmen; erst danach wird die Zielnummer gewählt." if native else
+                        "Rückruf angefordert. Nimm dein SIP-Telefon 100 an; danach wird die Zielnummer gewählt."}

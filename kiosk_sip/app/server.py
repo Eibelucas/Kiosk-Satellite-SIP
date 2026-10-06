@@ -143,6 +143,8 @@ def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
             with save_lock:
                 if isinstance(body, dict) and body.get("sip_port", settings.value["sip_port"]) in (gateway_port, ingress_port):
                     raise ValueError("SIP-Port und Web-Port müssen unterschiedlich sein.")
+                if isinstance(body, dict) and body.get("audio_target", settings.value.get("audio_target")) == "kiosk" and body.get("intercom_port", settings.value.get("intercom_port")) in (gateway_port, ingress_port):
+                    raise ValueError("Kiosk-Rückrufport und Web-Port müssen unterschiedlich sein.")
                 settings.save(body)
                 pbx.restart()
             return jsonify(ok=True, message="Gespeichert. Asterisk wurde neu gestartet. LAN-Zugriff bei Bedarf nach einem Add-on-Neustart aktivieren.")
@@ -176,7 +178,7 @@ def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
             return jsonify(ok=False, error="Eine aktive normale Rufnummer auswählen."), 400
         if not line["registered"]:
             return jsonify(ok=False, error="Der SIP-Anbieter ist noch nicht registriert. Einrichtung und Status prüfen."), 409
-        if not state["phone_registered"]:
+        if not state["phone_registered"] and not state.get("media_bridge"):
             return jsonify(ok=False, error="SIP-Telefon 100 anmelden. Der Kiosk selbst hat noch keine Audio-Bridge."), 409
         with call_lock:
             now = time.monotonic()
@@ -187,5 +189,26 @@ def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
             return jsonify(ok=True, **pbx.originate(number, line_id))
         except (OSError, RuntimeError):
             return jsonify(ok=False, error="Asterisk hat den Rückruf nicht angenommen. Add-on-Protokoll prüfen."), 502
+
+    @app.post("/api/intercom/probe")
+    def probe_intercom():
+        try:
+            return jsonify(ok=True, **pbx.probe_intercom())
+        except RuntimeError as exc:
+            return jsonify(ok=False, error=str(exc)), 409
+
+    @app.post("/api/intercom/test")
+    def test_intercom():
+        if not pbx.status().get("media_bridge"):
+            return jsonify(ok=False, error="Kiosk-Audio zuerst einrichten und speichern."), 409
+        with call_lock:
+            now = time.monotonic()
+            if now - last_call[0] < 5:
+                return jsonify(ok=False, error="Ein Test/Anruf wurde gerade angefordert."), 429
+            last_call[0] = now
+        try:
+            return jsonify(ok=True, **pbx.originate("600", local_test=True))
+        except (OSError, RuntimeError, ValueError):
+            return jsonify(ok=False, error="Lokaler Echo-Test konnte nicht starten. Eine aktive normale Rufnummer auswählen und Audio-Status prüfen."), 409
 
     return app

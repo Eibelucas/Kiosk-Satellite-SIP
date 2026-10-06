@@ -10,6 +10,6 @@ Asterisk und Telefon-Gateway in einem Add-on, mit deutschem Anbieter-Onboarding.
 - Anrufpad, Telefonkontakte und Kiosk-/Raumkarten mit Suche/Favoriten
 - Optionaler LAN-Zugang mit eigenem Kiosk-Passwort
 
-**Noch keine Audio-Anbindung an Kiosk Satellite Intercom.** Zum Sprechen oder Empfangen einer Durchsage ist vorerst ein SIP-Telefon/Softphone bzw. SIP-Lautsprecher nötig. Kiosk-Karten sind die Kontaktanzeige im Anrufpad.
+**Audio-Ziel wählen:** Ab 26.10.9 ist Kiosk Satellite Intercom mit nativer Anrufanzeige, Mikrofon und Lautsprecher verfügbar. Alternativ SIP-Telefon 100 verwenden. Ein konfigurierter Kiosk, gemeinsamer Intercom-Schlüssel und lokale HTTP/WS-Verbindung; TLS-Intercom ist noch nicht unterstützt. Kiosk-Karten sind die Kontaktanzeige im Anrufpad.
 
 Alle Schritte und Gegenproben stehen im Tab **Dokumentation** bzw. in [DOCS.md](DOCS.md).

@@ -15,6 +15,8 @@ DEFAULTS = {
     "auth_password": "", "listen_address": "127.0.0.1",
     "local_network": "10.99.0.0/24", "external_address": "",
     "sip_port": 5070, "phone_password": "", "lan_enabled": False,
+    "audio_target": "sip", "kiosk_address": "", "kiosk_port": 2324,
+    "intercom_port": 8090, "intercom_key": "",
     "web_username": "kiosk", "web_password_hash": "", "contacts": [], "lines": [], "outbound_line": "main", **ACCOUNT_DEFAULTS,
 }
 INPUT_FIELDS = (set(DEFAULTS) - {"web_password_hash"}) | {"web_password"}
@@ -136,7 +138,7 @@ def validate(body, previous=None):
     if not isinstance(body, dict) or set(body) - INPUT_FIELDS:
         raise ValueError("Ungültige Konfiguration.")
     cfg = {**DEFAULTS, **(previous or {})}
-    cfg.update({k: v for k, v in body.items() if k not in {"web_password", "auth_password", "phone_password"}})
+    cfg.update({k: v for k, v in body.items() if k not in {"web_password", "auth_password", "phone_password", "intercom_key"}})
     for key in ("enabled", "lan_enabled"):
         if not isinstance(cfg[key], bool):
             raise ValueError("Ungültiger Schalter.")
@@ -195,6 +197,29 @@ def validate(body, previous=None):
     if address in {network.network_address, network.broadcast_address}:
         raise ValueError("NAS-Adresse: eine Geräteadresse verwenden, nicht die Netz- oder Broadcast-Adresse des eingetragenen Heimnetzes.")
     cfg["listen_address"], cfg["local_network"] = str(address), str(network)
+    if not isinstance(cfg["audio_target"], str) or cfg["audio_target"] not in {"sip", "kiosk"}:
+        raise ValueError("Audio-Ziel: SIP-Telefon oder Kiosk Satellite auswählen.")
+    key = body.get("intercom_key", "")
+    if not isinstance(key, str):
+        raise ValueError("Ungültiger Intercom-Schlüssel.")
+    if key:
+        cfg["intercom_key"] = secret_value(key, "Intercom-Schlüssel", 16)
+    elif body.get("kiosk_address", cfg["kiosk_address"]) != (previous or {}).get("kiosk_address", cfg["kiosk_address"]):
+        cfg["intercom_key"] = ""
+    for name in ("kiosk_port", "intercom_port"):
+        if type(cfg[name]) is not int or not 1024 <= cfg[name] <= 65535:
+            raise ValueError("Kiosk-Intercom-Port und Rückrufport zwischen 1024 und 65535 eintragen.")
+    if cfg["audio_target"] == "kiosk":
+        try:
+            kiosk = ipaddress.IPv4Address(cfg["kiosk_address"])
+        except (ValueError, TypeError):
+            raise ValueError("Kiosk-Adresse: die lokale IPv4-Adresse des Kiosk-Geräts eingeben.") from None
+        if kiosk not in network or kiosk in {network.network_address, network.broadcast_address, address}:
+            raise ValueError("Kiosk-Adresse muss eine andere Geräte-IP im eingetragenen Heimnetz sein.")
+        if not cfg["intercom_key"]:
+            raise ValueError("Den gemeinsamen Intercom-Schlüssel aus Kiosk Satellite eintragen.")
+        if cfg["intercom_port"] in {5038, cfg["sip_port"]}:
+            raise ValueError("Kiosk-Rückrufport muss sich von SIP und AMI unterscheiden.")
     ext = cfg["external_address"]
     if not isinstance(ext, str):
         raise ValueError("Ungültige öffentliche Adresse.")
@@ -262,7 +287,8 @@ class Settings:
         self.value = cfg
 
     def public(self):
-        return {**{k: v for k, v in self.value.items() if k not in {"auth_password", "phone_password", "web_password_hash"}},
+        return {**{k: v for k, v in self.value.items() if k not in {"auth_password", "phone_password", "web_password_hash", "intercom_key"}},
+                "intercom_key_set": bool(self.value.get("intercom_key")),
                 "auth_password_set": bool(self.value["auth_password"]),
                 "phone_password_set": bool(self.value["phone_password"]),
                 "web_password_set": bool(self.value["web_password_hash"]),
@@ -276,8 +302,10 @@ def ini(value):
     return str(value).replace(";", r"\;")
 
 
-def asterisk_files(cfg, ami_secret):
+def asterisk_files(cfg, ami_secret, bridge_ports=None):
     ip, port = cfg["listen_address"], cfg["sip_port"]
+    native = cfg.get("audio_target") == "kiosk" and bridge_ports is not None
+    agi_port, audio_port = bridge_ports or (0, 0)
     pjsip = f"""[global]
 type=global
 user_agent=Kiosk-Satellite-SIP
@@ -401,7 +429,10 @@ include => from-kiosk-phone
     for line in lines:
         dial += f"\n[incoming-{line['id']}]\nexten => s,1,"
         if line["incoming_mode"] == "normal":
-            dial += "Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+            if native:
+                dial += f"Ringing()\n same => n,Gosub(kiosk-native,s,1({line['id']},call))\n same => n,Hangup()\n"
+            else:
+                dial += "Dial(PJSIP/100,45)\n same => n,Hangup()\n"
         elif line["incoming_mode"] == "announcement":
             dial += "Set(KIOSK_CALLER=${FILTER(0-9+,${CALLERID(num)})})\n"
             dial += ' same => n,GotoIf($["${CALLERID(num-pres):0:7}" != "allowed"]?denied)\n' 
@@ -414,10 +445,15 @@ include => from-kiosk-phone
             if line.get("announcement_pin"):
                 dial += f' same => n,Answer()\n same => n,Read(KIOSK_PIN,,6,,1,15)\n same => n,GotoIf($["${{KIOSK_PIN}}" != "{line["announcement_pin"]}"]?denied)\n'
             predial = 'b(kiosk-auto-answer^s^1)' if line["announcement_auto_answer"] else ''
-            dial += f' same => n,Page(PJSIP/100,qsi{predial},30)\n same => n,Hangup()\n same => n(denied),Hangup(21)\n'
+            if native:
+                dial += f' same => n,Gosub(kiosk-native,s,1({line["id"]},broadcast))\n same => n,Hangup()\n same => n(denied),Hangup(21)\n'
+            else:
+                dial += f' same => n,Page(PJSIP/100,qsi{predial},30)\n same => n,Hangup()\n same => n(denied),Hangup(21)\n'
         else:
             dial += "Hangup(21)\n"
     dial += "\n[kiosk-auto-answer]\nexten => s,1,Set(PJSIP_HEADER(add,Call-Info)=<sip:kiosk>\\;answer-after=0)\n same => n,Set(PJSIP_HEADER(add,Alert-Info)=<sip:kiosk>\\;info=alert-autoanswer)\n same => n,Return()\n"
+    if native:
+        dial += f"\n[kiosk-native]\nexten => s,1,Set(KIOSK_UUID=)\n same => n,AGI(agi://127.0.0.1:{agi_port},${{ARG1}},${{ARG2}})\n same => n,GotoIf($[${{LEN(${{KIOSK_UUID}})}} != 36]?failed)\n same => n,Dial(AudioSocket/127.0.0.1:{audio_port}/${{KIOSK_UUID}}/c(slin),60)\n same => n,Return()\n same => n(failed),Hangup(21)\n\n[kiosk-native-out]\nexten => s,1,Gosub(kiosk-native,s,1(local,call))\n same => n,Hangup()\n"
     account = resolve(selected) if selected else None
     return {
         "pjsip.conf": pjsip, "extensions.conf": dial,
@@ -433,7 +469,7 @@ include => from-kiosk-phone
             "res_pjsip_endpoint_identifier_user", "res_pjsip_endpoint_identifier_ip",
             "res_pjsip_registrar", "res_pjsip_outbound_registration", "res_pjsip_session",
             "res_pjsip_sdp_rtp", "res_pjsip_pubsub", "res_pjsip_nat", "res_pjsip_caller_id", "res_pjsip_dtmf_info", "res_rtp_asterisk", "chan_pjsip",
-            "codec_alaw", "codec_ulaw", "format_pcm", "bridge_simple", "bridge_native_rtp",
+            "codec_alaw", "codec_ulaw", "codec_resample", "res_agi", "res_audiosocket", "chan_audiosocket", "format_pcm", "bridge_simple", "bridge_native_rtp",
             "res_timing_timerfd", "bridge_softmix", "pbx_config", "app_dial", "app_echo", "app_stack", "app_confbridge", "app_page", "app_read", "func_timeout", "func_groupcount", "res_pjsip_header_funcs", "func_callerid", "func_strings", "func_logic", "func_channel",
         )), 
         "confbridge.conf": "[default_bridge]\ntype=bridge\ninternal_sample_rate=8000\nmixing_interval=20\n[default_user]\ntype=user\nquiet=yes\n",

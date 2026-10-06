@@ -14,7 +14,7 @@ Unter **Konfiguration** ist nur der Port der Kiosk-Telefonseite einstellbar (Sta
 
 Ab **26.10.6** weist Home Assistant den internen Ingress-Port dynamisch zu. Ein anderer Dienst auf `8099` verhindert die Einrichtung dadurch nicht mehr. Dazu liest das Add-on ausschließlich seine eigenen Informationen über die Supervisor-API mit der Standardrolle; der Supervisor-Token wird nicht angezeigt oder gespeichert.
 
-**Bei einem vorhandenen Startfehler:** Im Add-on-Store nach Updates suchen, das **HA-Add-on auf 26.10.8 aktualisieren** und neu starten. Das Aktualisieren des Kiosk-Plugins allein repariert den HA-Container nicht. Anschließend **Weboberfläche öffnen**. Wenn dort ein belegter SIP-Port gemeldet wird, unter **Heimnetz → SIP-Port** einen freien Port eintragen, z. B. `5072`, und speichern. Am SIP-Telefon denselben Port setzen. Gespeicherte Rufnummern und Zugangsdaten bleiben erhalten; kein Neuinstallieren oder Löschen nötig.
+**Bei einem vorhandenen Startfehler:** Im Add-on-Store nach Updates suchen, das **HA-Add-on auf 26.10.9 aktualisieren** und neu starten. Das Aktualisieren des Kiosk-Plugins allein repariert den HA-Container nicht. Anschließend **Weboberfläche öffnen**. Wenn dort ein belegter SIP-Port gemeldet wird, unter **Heimnetz → SIP-Port** einen freien Port eintragen, z. B. `5072`, und speichern. Am SIP-Telefon denselben Port setzen. Gespeicherte Rufnummern und Zugangsdaten bleiben erhalten; kein Neuinstallieren oder Löschen nötig.
 
 Bei belegtem SIP-/AMI-Port bleibt die HA-Einrichtung erreichbar und zeigt den Fehler. Ein belegter LAN-Webport deaktiviert nur die Kiosk-Webseite: unter **Add-on-Konfiguration → gateway_port** einen freien Port wählen und neu starten. Der tatsächliche SIP-Status steht im Assistenten; ein erreichbares Add-on bedeutet nicht automatisch einen angemeldeten Anschluss.
 
@@ -95,7 +95,7 @@ So richtest du das gewünschte Beispiel ein, ohne die Hauptnummer umzuwidmen:
 8. Von der erlaubten Nummer die **zweite Nummer** anrufen. Bei PIN: Nach Verbindungsaufbau innerhalb von 15 Sekunden die sechs Ziffern eingeben, eventuell mit `#` abschließen. Es gibt kein gesprochenes PIN-Menü. Danach sprechen.
 9. Gegenprobe von einer fremden Nummer und mit unterdrückter Rufnummer: Der Anruf muss abgewiesen werden. Die Hauptnummer weiterhin separat auf normales Klingeln testen.
 
-Die Durchsage nutzt Asterisk Page mit stummem Zielmikrofon. Sie kann derzeit **SIP-Telefon bzw. SIP-Lautsprecher 100** erreichen. Das Kiosk-Plugin hat noch keine direkte Audio-Bridge zu Kiosk Satellite Intercom: Allein die Plugin-Installation lässt den Android-Kiosk deshalb noch keine SIP-Durchsage abspielen. Verwende vorerst ein passendes SIP-Gerät/Softphone. Ohne aktiviertes/unterstütztes Header-Auto-Answer klingelt dieses Ziel und muss angenommen werden.
+Bei SIP-Audio nutzt die Durchsage Asterisk Page mit stummem Zielmikrofon auf Telefon/Lautsprecher 100. Ohne unterstütztes Header-Auto-Answer muss dieses Ziel angenommen werden. Bei Kiosk-Audio nutzt sie den nativen Intercom-Durchsage-Modus: Kiosk Satellite spielt den Hinweis und die Stimme über seinen Lautsprecher ab; sein Mikrofon wird nicht zurück an den Absender gesendet. Durchsagen müssen am Kiosk erlaubt sein. Nicht stören und besetzte Kiosks werden respektiert.
 
 Besetzte Ziele werden übersprungen; Anrufe werden nicht erzwungen unterbrochen. Jeweils eine Durchsage läuft; weitere werden abgewiesen. Der Raum endet beim Auflegen des Absenders oder beim Dauerlimit. Es gibt keine Aufzeichnung und keine externe Weiterleitung an die erlaubten Absendernummern.
 
@@ -103,7 +103,7 @@ Die Einstellungen hier ändern nicht die Nummernzuordnung im Router oder beim An
 
 ## 3. SIP-Telefon anmelden und Audio testen
 
-Das installierte Kiosk-Plugin ist derzeit ein Launcher für die Telefonseite. **Es nimmt SIP-/RTP-Audio noch nicht über Kiosk Satellite Intercom entgegen.** Verwende für den ersten Test ein SIP-Telefon oder eine SIP-Softphone-App im selben Heimnetz.
+Das Kiosk-Plugin öffnet die Telefonseite. Die Audio-Verbindung ist separat im HA-Add-on wählbar: natives Kiosk Satellite Intercom oder ein SIP-Telefon. Die folgenden Telefon-100-Schritte gelten nur für SIP-Audio.
 
 | Telefon-Einstellung | Wert |
 | --- | --- |
@@ -120,6 +120,22 @@ Das installierte Kiosk-Plugin ist derzeit ein Launcher für die Telefonseite. **
 3. Status der gewünschten Rufnummer prüfen: **registriert**. **wartet** ist kein Erfolgsnachweis; Registrierung kann einige Sekunden dauern.
 
 Nur ein SIP-Gerät gleichzeitig auf Nebenstelle 100 verwenden. Ein neu angemeldetes Gerät ersetzt die bisherige Registrierung.
+
+### Kiosk Satellite als Audio-Ziel ab 26.10.9
+
+1. **Das HA-Add-on auf 26.10.9 aktualisieren**, neu starten und die Weboberfläche öffnen. Ein Plugin-Update allein installiert die Audio-Brücke nicht.
+2. Am Android-Kiosk in **Einstellungen → Intercom** Intercom aktivieren und die Mikrofonberechtigung erlauben. Den gemeinsamen Intercom-Schlüssel anzeigen/kopieren. **Talk mode → Hands free** liefert Gegensprechen ohne gedrückte Sprechtaste; Push-to-talk funktioniert mit der Sprechtaste. Nicht stören verhindert Anrufe.
+3. Im HA-Assistenten **Telefon → Audio-Ziel → Kiosk Satellite Intercom** auswählen. Die eigene lokale Kiosk-IP und den Identitätsport eintragen. Meist ist dies der Remote-Admin-Port **2324**. Der separate, dynamische Intercom-Listener-Port wird aus der Identitätsantwort übernommen. Alternativ ist sein aktueller Port direkt verwendbar. Keine IP/Rufnummer aus Anleitungen übernehmen.
+4. Den gleichen **Intercom-Schlüssel** eintragen. Er bleibt lokal in der Add-on-Konfiguration mit eingeschränkten Dateirechten und wird nicht vom Status-/Setup-API zurückgegeben. Leer lassen behält ihn bei unveränderter Kiosk-IP. Bei Wechsel des Kiosks erneut eintragen.
+5. Einen freien **Kiosk-Rückrufport** wählen, Standard **8090**. Der Kiosk muss die eigene HAOS-IP auf diesem TCP-Port erreichen können. Nur Meldungen der eingetragenen Kiosk-IP mit gültigem Einmal-Token für den aktiven Anruf werden angenommen. AudioSocket und FastAGI binden ausschließlich Loopback an dynamische Ports. Keine Router-Portfreigabe einrichten.
+6. **Speichern und Asterisk starten**, anschließend **Kiosk-Verbindung prüfen**. Bei Änderung der LAN-Webadresse zusätzlich das Add-on neu starten. Es wird beim Speichern kein Anruf gestartet.
+7. **Lokalen Kiosk-Echo-Test starten** drücken. Am Kiosk erscheint ein Anruf. **Annehmen**, sprechen und sich selbst hören; am Kiosk auflegen. Der Test wählt ausschließlich die lokale Asterisk-Echo-Nebenstelle 600, keine externe Nummer. Die Diagnose zeigt gesendete und empfangene Audio-Frames.
+8. Erst danach eine eigene Testnummer im Anrufpad eingeben und **Anrufen** bestätigen. Der Kiosk klingelt zuerst. Erst nach dem Annehmen wird die externe Zielnummer gewählt. Ein normaler eingehender Anruf klingelt entsprechend am Kiosk.
+9. Für separate Durchsagen am Kiosk **Accept announcements** erlauben. Die bisherige Absenderliste/PIN und das Dauerlimit bleiben aktiv. Ein erlaubter Durchsage-Anruf verwendet den einseitigen Intercom-Modus; das Kiosk-Mikrofon wird verworfen. Mit fremder/unterdrückter Absendernummer und mit Nicht stören gegenprüfen.
+
+**Umfang und Grenzen:** Ein konfiguriertes Kiosk-Gerät, 16-kHz-PCM-Audio über den nativen Intercom-WebSocket. Kiosk Satellite kümmert sich um Mikrofon, Lautsprecher, seine Anrufanzeige und Echo-Unterdrückung. Die Brücke verwendet derzeit lokale HTTP/WS-Verbindungen. Wenn der Kiosk verschlüsseltes Intercom verlangt, wird die Verbindung mit Hinweis abgewiesen; die Einstellung wird nicht verändert. TLS-Intercom, mehrere Audio-Kiosks pro Anruf und externe Internet-Nutzung sind nicht enthalten. Ein echtes Android-Gerät, Mikrofonberechtigungen, Talk mode und Router-NAT sind nach dem automatisierten Echo-Test noch vor Ort zu prüfen.
+
+Bei **Kiosk nicht erreichbar** die IP und den Identitätsport prüfen. Bei **anderer Schlüssel** den Intercom-Schlüssel beider Seiten vergleichen. Bei Klingeln ohne Audio den HAOS-Rückrufport, Mikrofonberechtigung, Talk mode und Audio-Frame-Zähler prüfen. Beim Auflegen muss die Anrufanzeige schließen. Der SIP-Telefon-Modus 100 bleibt wählbar; ein Update stellt bestehende Installationen nicht automatisch auf Kiosk-Audio um.
 
 ## 4. Kiosk verbinden
 
@@ -148,7 +164,7 @@ Eingehende Telekom-Anrufe werden auf SIP-Telefon 100 weitergeleitet. Voraussetzu
 | Symptom | Nächster Schritt |
 | --- | --- |
 | Asterisk startet nicht | Add-on-Protokoll lesen. NAS-IP muss auf HAOS tatsächlich vorhanden und SIP-Port frei sein. |
-| `Address in use` auf `8099` / Ingress-Traceback | HA-Add-on auf 26.10.8 aktualisieren und neu starten; Ingress verwendet den von HA zugewiesenen Port. |
+| `Address in use` auf `8099` / Ingress-Traceback | HA-Add-on auf 26.10.9 aktualisieren und neu starten; Ingress verwendet den von HA zugewiesenen Port. |
 | `transport-udp`: `Address in use` | HA-Weboberfläche → Heimnetz → SIP-Port auf einen freien Port ändern und speichern; Telefon 100 auf denselben Port ändern. |
 | AMI-Port `5038` belegt | Anderen lokalen Asterisk-/AMI-Dienst prüfen. Beide Dienste dürfen denselben Loopback-Port nicht gleichzeitig verwenden. |
 | Telekom: abgelehnt | Rufnummer/Anschlusstyp prüfen, ggf. zur Passwort-Anmeldung wechseln. Authentifizierungsname und Rufnummer sind unterschiedliche Felder. |
@@ -194,4 +210,4 @@ Stand: 6. Oktober 2026. Der Build wird in CI geprüft. Eine echte Telekom-Regist
 4. Speichern. Auf der Telefonseite erscheinen die Karten unter **Kontakte**; **Kiosks** filtert nur Kiosk-Karten. Die Suche findet Namen, Räume und Nummern.
 5. Eine Karte auswählen. Sie setzt die Zielnummer im Anrufpad. Erst **Anrufen** und die Rückruf-Bestätigung starten den Anruf.
 
-Es werden keine nativen Kiosk-Satellite-Intercom-Peers angelegt. Online-Status oder Präsenz werden nicht vorgetäuscht. Kiosk-Karten verwenden die von dir zugeordnete Telefonnummer und den normalen SIP-Rückruf auf Telefon 100. Noch keine internen Kiosk-Nebenstellen oder direkte Android-Audio-Bridge. Normale Telefonkontakte aus älteren Versionen bleiben erhalten.
+Es werden keine nativen Kiosk-Satellite-Intercom-Peers angelegt. Online-Status oder Präsenz werden nicht vorgetäuscht. Kiosk-Karten verwenden die von dir zugeordnete Telefonnummer und den Rückruf auf das gewählte Audio-Ziel. Es werden keine zusätzlichen internen Kiosk-Nebenstellen angelegt. Normale Telefonkontakte aus älteren Versionen bleiben erhalten.

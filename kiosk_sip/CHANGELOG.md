@@ -1,3 +1,13 @@
+# 26.10.9
+
+- Audio-Ziel Kiosk Satellite Intercom: Asterisk-20-AudioSocket mit 8-kHz-PCM, Umwandlung auf 16 kHz und nativer Intercom-WebSocket-Verbindung.
+- Normale Anrufe klingeln am Kiosk; erst Annehmen öffnet Audio und verbindet den Anruf.
+- Separate Durchsagen behalten Absenderliste/PIN/Dauerlimit und verwenden einseitigen Kiosk-Intercom-Modus.
+- Signierte Rückmeldungen, Token-Wiederverwendungsschutz, lokale Schlüsselablage ohne Ausgabe in Status/API/Logs.
+- Verbindung prüfen und lokaler Kiosk-Echo-Test im Assistenten. Eigene Geräte-IP, Identitätsport und gemeinsamer Schlüssel.
+- Der Kiosk-Intercom-Port wird aus seiner Identität übernommen. Ein konfiguriertes Kiosk-Gerät, lokales HTTP/WS; verschlüsseltes Intercom wird abgewiesen und nicht umgestellt.
+- Das bisherige SIP-Telefon 100 bleibt als alternative Audio-Ausgabe erhalten.
+
 # 26.10.8
 
 - Unterscheidet private Geräte-IP, falsches Heimnetz und unzulässige Netz-/Broadcast-Adressen in der Fehlermeldung.

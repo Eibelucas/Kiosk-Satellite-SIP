@@ -14,6 +14,8 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 
 | Korrektur | [26.10.8](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.8) | Präzise Heimnetz-Prüfung und kein vorbelegtes Beispielnetz |
 
+| Audio | [26.10.9](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.9) | Native Intercom-Audio-Brücke für ein Kiosk-Gerät, normales Klingeln, einseitige Durchsage und Echo-Test |
+
 ## Installieren und aktualisieren
 
 Repository-URL für **Kiosk Satellite → Plugin-Manager → Repository hinzufügen**:
@@ -47,9 +49,11 @@ Der Upload erfolgt nach Prüfung der ZIP: genau Manifest, `plugin.jar` mit Andro
 - Abweisung fremder/anonymer Absender auf der Durchsage-Nummer.
 - Auto-Answer-Header nur auf der Durchsage, tatsächliche RTP-Übertragung zum Ziel und stummes Zielmikrofon.
 - Kontakt-/Kiosk-Karten und JavaScript-Syntax.
+- Native Intercom-Signalisierung, HMAC-Token, Annahme/Auflegen, 16-kHz-Audio in beide Richtungen und kein Mikrofon-Rückweg bei Durchsagen.
+- Echten Asterisk-AudioSocket-Pfad mit lokalem Echo und simuliertem Kiosk; kein externer Anruf.
 
 Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwendet. Es wird kein externer Testanruf gewählt. Die unterschiedlichen realen Anbieteranschlüsse, Router-NAT, das Header-Auto-Answer deines Geräts und Home-Assistant-Supervisor auf dem eingesetzten HAOS-System müssen vor Ort geprüft werden.
 
 ## Verbleibende Grenze
 
-Audio geht derzeit über SIP-Telefon/Softphone/Lautsprecher **100**. Eine direkte SIP/RTP-Audio-Bridge zu Kiosk Satellite Intercom fehlt. Kiosk-Karten sind die Darstellung von Kontakten im Anrufpad, keine automatisch registrierten nativen Intercom-Peers. TLS/SRTP, reine IP-authentifizierte Trunks und gemeinsame Trunk-Registrierungen für mehrere Durchwahlen sind keine fertigen Profile.
+Audio geht wahlweise über SIP-Telefon **100** oder die native Audio-Brücke zu einem konfigurierten Kiosk Satellite Intercom. Kiosk-Audio verwendet derzeit lokale HTTP/WS-Verbindungen; TLS-Intercom wird abgewiesen und bleibt unverändert. Kiosk-Karten sind die Darstellung von Kontakten im Anrufpad, keine automatisch registrierten nativen Intercom-Peers. TLS/SRTP, reine IP-authentifizierte Trunks und gemeinsame Trunk-Registrierungen für mehrere Durchwahlen sind keine fertigen Profile.

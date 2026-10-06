@@ -38,3 +38,5 @@ jobs:
           docker exec kiosk-sip-test asterisk -rx 'core show uptime' | grep 'System uptime'
           docker cp tests/sip_smoke.py kiosk-sip-test:/tmp/sip_smoke.py
           docker exec kiosk-sip-test /opt/venv/bin/python /tmp/sip_smoke.py
+          docker cp tests/native_audio_smoke.py kiosk-sip-test:/tmp/native_audio_smoke.py
+          docker exec kiosk-sip-test /opt/venv/bin/python /tmp/native_audio_smoke.py
