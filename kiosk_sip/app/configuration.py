@@ -366,7 +366,81 @@ contact=sip:{account['registrar']}
             pjsip += f"\n[{identifier}-auth]\ntype=auth\nauth_type=userpass\nusername={ini(line['auth_username'])}\npassword={ini(line['auth_password'])}\nrealm={ini(account['realm']) or '*'}\n"
     for server, group in groups.items():
         first = next(line for line in lines if resolve(line)["registrar"].split(":")[0].lower() == server)
-        pjsip += f"\n[provider-{group}-identify]\ntype=identify\nendpoint=line-{first['id']}\nmatch={server}\ns…1388 tokens truncated…"[general]\n",
+        pjsip += f"\n[provider-{group}-identify]\ntype=identify\nendpoint=line-{first['id']}\nmatch={server}\nsrv_lookups=yes\n"
+    dial = """[general]
+static=yes
+writeprotect=yes
+clearglobalvars=no
+
+[from-phone]
+exten => 600,1,Answer()
+ same => n,Echo()
+ same => n,Hangup()
+include => from-kiosk-phone
+
+[from-kiosk-phone]
+"""
+    selected = next((line for line in lines if line["id"] == cfg.get("outbound_line", "main") and line["incoming_mode"] == "normal"), None)
+    if selected:
+        for pattern in ("_X.", "_+X.", "_*X.", "_#X."):
+            dial += f"exten => {pattern},1,Goto(from-out-{selected['id']},${{EXTEN}},1)\n"
+    for line in lines:
+        if line["incoming_mode"] == "normal":
+            dial += f"\n[from-out-{line['id']}]\n"
+            for pattern in ("_X.", "_+X.", "_*X.", "_#X."):
+                dial += f"exten => {pattern},1,Set(CALLERID(num)={line['phone_number']})\n same => n,Dial(PJSIP/${{EXTEN}}@line-{line['id']},60)\n same => n,Hangup()\n"
+    for server, group in groups.items():
+        dial += f"\n[from-provider-{group}]\n"
+        for line in lines:
+            if resolve(line)["registrar"].split(":")[0].lower() != server:
+                continue
+            for alias in incoming_aliases(line):
+                dial += f"exten => {alias},1,Goto(incoming-{line['id']},s,1)\n"
+        # Unknown called numbers never fall through into an outbound context.
+        dial += "exten => _X.,1,Hangup(1)\nexten => _+X.,1,Hangup(1)\nexten => s,1,Hangup(1)\n"
+    for line in lines:
+        dial += f"\n[incoming-{line['id']}]\nexten => s,1,"
+        if line["incoming_mode"] == "normal":
+            dial += "Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+        elif line["incoming_mode"] == "announcement":
+            dial += "Set(KIOSK_CALLER=${FILTER(0-9+,${CALLERID(num)})})\n"
+            dial += ' same => n,GotoIf($["${CALLERID(num-pres):0:7}" != "allowed"]?denied)\n' 
+            dial += ' same => n,GotoIf($[${LEN(${CALLERID(num)})} != ${LEN(${KIOSK_CALLER})}]?denied)\n'
+            for caller in line["announcement_callers"]:
+                for alias in number_aliases(caller):
+                    dial += f' same => n,GotoIf($["${{KIOSK_CALLER}}" = "{alias}"]?authorized)\n'
+            dial += ' same => n,Goto(denied)\n same => n(authorized),Set(GROUP(kiosk-page)=active)\n same => n,GotoIf($[${GROUP_COUNT(active@kiosk-page)} > 1]?denied)\n'
+            dial += f' same => n,Set(TIMEOUT(absolute)={line["announcement_max_seconds"]})\n'
+            if line.get("announcement_pin"):
+                dial += f' same => n,Answer()\n same => n,Read(KIOSK_PIN,,6,,1,15)\n same => n,GotoIf($["${{KIOSK_PIN}}" != "{line["announcement_pin"]}"]?denied)\n'
+            predial = 'b(kiosk-auto-answer^s^1)' if line["announcement_auto_answer"] else ''
+            dial += f' same => n,Page(PJSIP/100,qsi{predial},30)\n same => n,Hangup()\n same => n(denied),Hangup(21)\n'
+        else:
+            dial += "Hangup(21)\n"
+    dial += "\n[kiosk-auto-answer]\nexten => s,1,Set(PJSIP_HEADER(add,Call-Info)=<sip:kiosk>\\;answer-after=0)\n same => n,Set(PJSIP_HEADER(add,Alert-Info)=<sip:kiosk>\\;info=alert-autoanswer)\n same => n,Return()\n"
+    account = resolve(selected) if selected else None
+    return {
+        "pjsip.conf": pjsip, "extensions.conf": dial,
+        "manager.conf": f"[general]\nenabled=yes\nwebenabled=no\nbindaddr=127.0.0.1\nport=5038\n\n[kioskphone]\nsecret={ini(ami_secret)}\ndeny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.255\nread=none\nwrite=originate\n",
+        "rtp.conf": "[general]\nrtpstart=30000\nrtpend=30100\nicesupport=yes\n" + (f"stunaddr={account['stun_server']}\n" if account and account["stun_server"] else ""),
+        "resolver_unbound.conf": "[general]\nresolv=system\nhosts=system\n",
+        "stasis.conf": "[threadpool]\ninitial_size=5\n",
+        "dnsmgr.conf": "[general]\nenable=yes\nrefreshinterval=90\n",
+        "http.conf": "[general]\nenabled=no\n",
+        "modules.conf": "[modules]\nautoload=no\n" + "".join(f"load={module}.so\n" for module in (
+            "res_resolver_unbound", "res_pjproject", "res_sorcery_config", "res_sorcery_memory", "res_sorcery_astdb",
+            "res_pjsip", "res_pjsip_authenticator_digest", "res_pjsip_outbound_authenticator_digest",
+            "res_pjsip_endpoint_identifier_user", "res_pjsip_endpoint_identifier_ip",
+            "res_pjsip_registrar", "res_pjsip_outbound_registration", "res_pjsip_session",
+            "res_pjsip_sdp_rtp", "res_pjsip_pubsub", "res_pjsip_nat", "res_pjsip_caller_id", "res_pjsip_dtmf_info", "res_rtp_asterisk", "chan_pjsip",
+            "codec_alaw", "codec_ulaw", "format_pcm", "bridge_simple", "bridge_native_rtp",
+            "res_timing_timerfd", "bridge_softmix", "pbx_config", "app_dial", "app_echo", "app_stack", "app_confbridge", "app_page", "app_read", "func_timeout", "func_groupcount", "res_pjsip_header_funcs", "func_callerid", "func_strings", "func_logic", "func_channel",
+        )), 
+        "confbridge.conf": "[default_bridge]\ntype=bridge\ninternal_sample_rate=8000\nmixing_interval=20\n[default_user]\ntype=user\nquiet=yes\n",
+        "cdr.conf": "[general]\nenable=no\n",
+        "cel.conf": "[general]\nenable=no\n",
+        "ccss.conf": "[general]\n",
+        "features.conf": "[general]\n",
         "acl.conf": "; No reusable ACL objects. Per-endpoint rules are in pjsip.conf.\n",
         "udptl.conf": "[general]\nudptlstart=4000\nudptlend=4999\n",
         "pjproject.conf": "[global]\n",
