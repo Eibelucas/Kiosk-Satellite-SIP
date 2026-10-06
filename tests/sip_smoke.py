@@ -29,20 +29,20 @@ def main():
     password = "fake-phone;secret\\with-punctuation"
     cfg = {**DEFAULTS, "phone_password": password, "listen_address": "127.0.0.1",
            "local_network": "127.0.0.1/32", "sip_port": 15070}
-    cfg['phone_number'] = '+4921611234567'
+    cfg['phone_number'] = '+4900001234567'
     cfg['lines'] = [{**cfg, 'id':'main', 'label':'Main', 'provider':'custom', 'enabled':True,
                      'incoming_mode':'normal', 'auth_mode':'password', 'auth_username':'fake',
                      'auth_password':'fake-provider-secret', 'registrar':'sip-test.example.com',
-                     'domain':'sip-test.example.com', 'client_user':'+4921611234567', 'contact_user':'+4921611234567',
-                     'from_user':'+4921611234567', 'stun_server':''},
+                     'domain':'sip-test.example.com', 'client_user':'+4900001234567', 'contact_user':'+4900001234567',
+                     'from_user':'+4900001234567', 'stun_server':''},
                     {**cfg, 'id':'second', 'label':'Second', 'provider':'custom', 'enabled':True,
-                     'incoming_mode':'reject', 'phone_number':'+4921611234568', 'auth_mode':'password', 'auth_username':'fake2',
+                     'incoming_mode':'reject', 'phone_number':'+4900001234568', 'auth_mode':'password', 'auth_username':'fake2',
                      'auth_password':'fake-provider-secret2', 'registrar':'sip-test.example.com',
-                     'domain':'sip-test.example.com', 'client_user':'+4921611234568', 'contact_user':'+4921611234568',
-                     'from_user':'+4921611234568', 'stun_server':''}]
-    cfg['lines'].append({**cfg['lines'][1], 'id':'page', 'phone_number':'+4921611234569',
-        'client_user':'+4921611234569', 'contact_user':'+4921611234569', 'from_user':'+4921611234569',
-        'incoming_mode':'announcement', 'announcement_callers':['+491701234567'],
+                     'domain':'sip-test.example.com', 'client_user':'+4900001234568', 'contact_user':'+4900001234568',
+                     'from_user':'+4900001234568', 'stun_server':''}]
+    cfg['lines'].append({**cfg['lines'][1], 'id':'page', 'phone_number':'+4900001234569',
+        'client_user':'+4900001234569', 'contact_user':'+4900001234569', 'from_user':'+4900001234569',
+        'incoming_mode':'announcement', 'announcement_callers':['+4900011234567'],
         'announcement_auto_answer':True, 'announcement_max_seconds':30, 'announcement_pin':''})
     # A local DNS server proves NAPTR/SRV resolution uses the configured
     # resolver, rather than relying on an A-record at a fixed SIP port.
@@ -163,7 +163,7 @@ def main():
                 time.sleep(.2)
             assert result.count(' Registered')>=3,(result,dns_queries)
             assert ('_sip._udp.sip-test.example.com',33) in dns_queries,dns_queries
-            def invite(destination, expect_phone, expected_code=None, caller='+491701234567', page=False):
+            def invite(destination, expect_phone, expected_code=None, caller='+4900011234567', page=False):
                 ident=uuid.uuid4().hex
                 sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
                 request=(f'INVITE sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{ident};rport\r\nMax-Forwards: 70\r\nFrom: <sip:{caller}@127.0.0.1>;tag={ident}\r\nTo: <sip:{destination}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: 1 INVITE\r\nContact: <sip:fake@127.0.0.1:15071>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}')
@@ -233,12 +233,12 @@ def main():
                 else: raise AssertionError('No final response for test INVITE')
                 code=int(reply.split()[1])
                 assert code==(expected_code or (486 if expect_phone else 403)),(destination,reply)
-            invite('+4921611234567',True)
-            invite('+4921611234568',False)
-            invite('+4921619999999',False,404)
-            invite('+4921611234569',False,403,caller='+491709999999')
-            invite('+4921611234569',False,403,caller='anonymous')
-            invite('+4921611234569',True,page=True)
+            invite('+4900001234567',True)
+            invite('+4900001234568',False)
+            invite('+4900009999999',False,404)
+            invite('+4900001234569',False,403,caller='+4900019999999')
+            invite('+4900001234569',False,403,caller='anonymous')
+            invite('+4900001234569',True,page=True)
         dialplan = subprocess.check_output(["asterisk", "-C", astconf, "-rx", "dialplan show 600@from-phone"], text=True)
         assert "Echo()" in dialplan, dialplan
         print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, local DNS SRV resolution, three fake provider registrations, isolated incoming routing, announcement allowlist, Auto-Answer headers and one-way RTP audio and echo dialplan. No external call made.")

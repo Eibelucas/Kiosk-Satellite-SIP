@@ -2,7 +2,7 @@
 
 Asterisk und Telefon-Gateway in einem Add-on, mit deutschem Anbieter-Onboarding.
 
-- amd64, passend für HAOS direkt auf dem UGREEN DXP2800
+- amd64, passend für HAOS auf einem unterstützten amd64-System
 - Einrichtung über Home Assistant Ingress
 - Telekom, sipgate, easybell, FRITZ!Box und eigene SIP-Zugangsdaten
 - Mehrere Rufnummern, normale Hauptrufnummer und separate Durchsagen mit Absenderliste/PIN

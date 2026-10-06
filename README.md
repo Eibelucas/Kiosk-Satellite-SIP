@@ -2,7 +2,7 @@
 
 ## Auf deinem HAOS installieren
 
-Für **HAOS direkt auf einem UGREEN DXP2800** gibt es jetzt ein gemeinsames Add-on mit **Asterisk, Telefon-Gateway und deutschem Anbieter-Onboarding**.
+Für **HAOS auf einem unterstützten amd64-System** gibt es jetzt ein gemeinsames Add-on mit **Asterisk, Telefon-Gateway und deutschem Anbieter-Onboarding**.
 
 1. HA → Einstellungen → Apps/Add-ons → Store → Drei-Punkte-Menü → Repositories.
 2. `https://github.com/Eibelucas/Kiosk-Satellite-SIP` hinzufügen.
@@ -102,7 +102,7 @@ ASTERISK_CONTEXT=from-kiosk-phone
 ASTERISK_CALLER_ID=Kiosk <100>
 ```
 
-For a number such as `02161123456`, the gateway currently originates the configured local channel and sends the number into the configured dialplan context.
+For a user-entered destination number, the gateway originates the configured local channel and sends that number into the configured dialplan context.
 
 ## Security
 

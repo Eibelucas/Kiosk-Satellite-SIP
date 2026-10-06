@@ -1,6 +1,6 @@
 # Einrichtung auf HAOS
 
-Für HAOS direkt auf einem UGREEN DXP2800 (amd64). Kein UGOS, keine zusätzliche VM und kein separates Asterisk-Add-on erforderlich: Dieses Add-on enthält Asterisk und den SIP-Gateway.
+Für HAOS auf einem unterstützten amd64-System (amd64). Kein separates Asterisk-Add-on erforderlich: Dieses Add-on enthält Asterisk und den SIP-Gateway.
 
 ## 1. Add-on installieren
 
@@ -41,12 +41,12 @@ Für Telekom gilt folgende Einordnung:
 
 | Feld | Was du einträgst |
 | --- | --- |
-| Festnetznummer | Deine vollständige Nummer, international: aus `02161…` wird `+492161…` |
+| Festnetznummer | Die eigene vollständige Rufnummer mit Landesvorwahl, ohne Leerzeichen |
 | Telekom-Anmeldung | Zunächst Anschluss-Authentifizierung ohne Passwort, falls für deinen Zugang verfügbar; andernfalls Passwort-Anmeldung |
 | Authentifizierungsname | Bei Passwort-Anmeldung: der gültige Telekom-Authentifizierungsname, in Kleinschreibung |
 | Telekom-Passwort | Das zu diesem Zugang gehörende Telefonie-Passwort gemäß Telekom-Hilfe; nicht ungeprüft das separate E-Mail-Programm-Passwort |
-| NAS-IP | Die lokale IPv4-Adresse deines DXP2800, z. B. `192.168.2.20`; im Router dauerhaft zuordnen |
-| Heimnetz | Dein tatsächliches Netz, z. B. `192.168.2.0/24` bei Netzmaske `255.255.255.0` |
+| NAS-IP | Die eigene lokale IPv4-Adresse des HAOS-Systems; im Router dauerhaft zuordnen |
+| Heimnetz | Das eigene IPv4-Heimnetz in CIDR-Schreibweise |
 | SIP-Port | Standard `5070`; am SIP-Telefon denselben Port verwenden |
 | Externe Adresse | Optional deine aktuelle öffentliche IPv4-Adresse, wenn die RTP/NAT-Konfiguration sie benötigt |
 | Passwort für Telefon 100 | Ein eigenes, langes Passwort für das SIP-Telefon/Softphone |
@@ -80,9 +80,9 @@ So richtest du das gewünschte Beispiel ein, ohne die Hauptnummer umzuwidmen:
 
 | Konto | Rolle | Beispiel |
 | --- | --- | --- |
-| Hauptrufnummer | Normal auf Telefon 100 klingeln | `+4921611234567` (Beispieldaten ersetzen) |
-| Separate zweite Nummer | Durchsage von erlaubten Nummern | `+4921611234568` (Beispieldaten ersetzen) |
-| Erlaubter Absender für die zweite Nummer | Eigene vollständige Anrufernummer | `+491701234567` (Beispieldaten ersetzen) |
+| Hauptrufnummer | Normal auf Telefon 100 klingeln | `<HAUPTRUFNUMMER>` |
+| Separate zweite Nummer | Durchsage von erlaubten Nummern | `<DURCHSAGE-RUFNUMMER>` |
+| Erlaubter Absender für die zweite Nummer | Eigene vollständige Anrufernummer | `<ERLAUBTE-ANRUFERNUMMER>` |
 | Standard ausgehend | Hauptrufnummer | Normale Gespräche verwenden die erste Nummer |
 
 1. Deine Hauptnummer als normales Konto lassen.
@@ -107,7 +107,7 @@ Das installierte Kiosk-Plugin ist derzeit ein Launcher für die Telefonseite. **
 
 | Telefon-Einstellung | Wert |
 | --- | --- |
-| Server/Domain/Registrar | NAS-IP, z. B. `192.168.2.20` |
+| Server/Domain/Registrar | Die eigene lokale IPv4-Adresse des HAOS-Systems |
 | Port | `5070` oder dein eingestellter SIP-Port |
 | Transport | UDP |
 | Benutzername | `100` |

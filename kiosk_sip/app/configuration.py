@@ -13,7 +13,7 @@ DEFAULTS = {
     "enabled": False, "provider": "telekom_private", "phone_number": "",
     "auth_mode": "access", "auth_username": "anonymous@t-online.de",
     "auth_password": "", "listen_address": "127.0.0.1",
-    "local_network": "192.168.2.0/24", "external_address": "",
+    "local_network": "10.99.0.0/24", "external_address": "",
     "sip_port": 5070, "phone_password": "", "lan_enabled": False,
     "web_username": "kiosk", "web_password_hash": "", "contacts": [], "lines": [], "outbound_line": "main", **ACCOUNT_DEFAULTS,
 }
@@ -88,7 +88,7 @@ def validate_line(raw, previous=None):
     if not isinstance(cfg["auth_mode"], str) or cfg["auth_mode"] not in {"access", "password"} or (cfg["auth_mode"] == "access" and cfg["provider"] != "telekom_private"):
         raise ValueError("Dieser Anbieter benötigt SIP-Benutzername und SIP-Passwort.")
     if not isinstance(cfg["phone_number"], str) or not PHONE.fullmatch(cfg["phone_number"]):
-        raise ValueError("Rufnummer international, etwa +492611234567, ohne Leerzeichen eingeben.")
+        raise ValueError("Die eigene Rufnummer mit +Landesvorwahl und ohne Leerzeichen eingeben.")
     if any(not isinstance(cfg.get(key, ""), str) for key in ACCOUNT_DEFAULTS):
         raise ValueError("SIP-Server und IDs müssen Text sein.")
     if not isinstance(cfg["auth_username"], str):

@@ -17,8 +17,8 @@ from server import IngressOnly, LanOnly, create_app
 
 
 def valid(**changes):
-    return {"enabled": True, "phone_number": "+4921611234567", "listen_address": "192.168.2.20",
-            "local_network": "192.168.2.0/24", "phone_password": "fake-phone-secret-123",
+    return {"enabled": True, "phone_number": "+4900001234567", "listen_address": "10.99.0.20",
+            "local_network": "10.99.0.0/24", "phone_password": "fake-phone-secret-123",
             "lan_enabled": True, "web_password": "fake-kiosk-secret-123", **changes}
 
 
@@ -71,12 +71,12 @@ def test_repository_and_addon_metadata():
 
 
 @pytest.mark.parametrize("change", [
-    {"phone_number": "021611234567"}, {"phone_number": "+49216\n[evil]"},
+    {"phone_number": "000001234567"}, {"phone_number": "+49216\n[evil]"},
     {"listen_address": "0.0.0.0"}, {"listen_address": "8.8.8.8"},
     {"local_network": "0.0.0.0/0"}, {"phone_password": " padded-secret "}, {"listen_address": "192.168.3.20"}, {"sip_port": True}, {"sip_port": 8099},
     {"phone_password": "short"}, {"phone_password": "hello\r\n[evil]"},
     {"provider": "business"}, {"auth_mode": "password", "auth_username": "TEST@example.com"},
-    {"external_address": "192.168.2.1"}, {"lan_enabled": True, "web_password": ""},
+    {"external_address": "10.99.0.1"}, {"lan_enabled": True, "web_password": ""},
     {"contacts": [{"name": "Max", "number": "123\r\nAction: Command"}]},
     {"enabled": "true"}, {"web_password_hash": "injected"},
 ])
@@ -115,7 +115,7 @@ def test_generated_pbx_isolated_ami_and_no_inbound_outbound_context(tmp_path):
 def test_ingress_socket_source_required_and_headers_cannot_spoof(instance):
     _, _, app = instance
     client = Client(IngressOnly(app), Response)
-    assert client.get("/api/setup", environ_overrides={"REMOTE_ADDR": "192.168.2.50"},
+    assert client.get("/api/setup", environ_overrides={"REMOTE_ADDR": "10.99.0.50"},
                       headers={"X-Ingress-Path": "/fake", "X-Forwarded-For": "172.30.32.2"}).status_code == 403
     assert client.get("/api/setup", environ_overrides={"REMOTE_ADDR": "172.30.32.2"}).status_code == 200
 
@@ -157,7 +157,7 @@ def test_ingress_relative_assets_and_csrf(instance):
 def test_configuration_does_not_call_and_restart_is_explicit(instance):
     settings, pbx, app = instance
     client = app.test_client()
-    response = trusted(client, "POST", "/api/setup", json={"contacts": [{"name": "<script>", "number": "+4921611234567"}]},
+    response = trusted(client, "POST", "/api/setup", json={"contacts": [{"name": "<script>", "number": "+4900001234567"}]},
                        headers={"X-CSRF-Token": token(client)})
     assert response.status_code == 200 and pbx.restarts == 1
     assert pbx.calls == []
@@ -171,16 +171,16 @@ def test_callback_requires_registration_and_valid_number(instance):
     for body in ([], None, {"number": "123\r\nAction: Command"}, {"number": 123}):
         assert trusted(client, "POST", "/api/call", json=body, headers=headers).status_code == 400
     pbx.state["phone_registered"] = False
-    assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 409
+    assert trusted(client, "POST", "/api/call", json={"number": "+4900001234567"}, headers=headers).status_code == 409
     pbx.state["phone_registered"] = True
     pbx.state["telekom_registered"] = False
     pbx.state["lines"][0]["registered"] = False
-    assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 409
+    assert trusted(client, "POST", "/api/call", json={"number": "+4900001234567"}, headers=headers).status_code == 409
     pbx.state["telekom_registered"] = True
     pbx.state["lines"][0]["registered"] = True
-    assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 200
-    assert pbx.calls == ["+4921611234567"]
-    assert trusted(client, "POST", "/api/call", json={"number": "+4921611234567"}, headers=headers).status_code == 429
+    assert trusted(client, "POST", "/api/call", json={"number": "+4900001234567"}, headers=headers).status_code == 200
+    assert pbx.calls == ["+4900001234567"]
+    assert trusted(client, "POST", "/api/call", json={"number": "+4900001234567"}, headers=headers).status_code == 429
 
 
 def test_password_change_invalidates_lan_session(instance):
@@ -193,9 +193,9 @@ def test_password_change_invalidates_lan_session(instance):
     assert client.get("/api/status").status_code == 401
 
 @pytest.mark.parametrize('provider,server,client', [
-    ('telekom_private','tel.t-online.de','+4921611234567'),
+    ('telekom_private','tel.t-online.de','+4900001234567'),
     ('sipgate','sipgate.de','FakeSipID'),
-    ('easybell','voip.easybell.de','004921611234567'),
+    ('easybell','voip.easybell.de','004900001234567'),
     ('fritzbox','fritz.box','FakeSipID'),
     ('vodafone','sip.example.net','FakeSipID'), ('1und1','sip.example.net','FakeSipID'),
     ('o2','sip.example.net','FakeSipID'), ('custom','sip.example.net','FakeSipID'),
@@ -222,19 +222,19 @@ def test_provider_change_requires_fresh_credentials():
     assert cfg['auth_password']=='fresh-secret'
 
 
-def line(id='main', number='+4921611234567', **changes):
+def line(id='main', number='+4900001234567', **changes):
     return {'id':id,'label':id,'enabled':True,'incoming_mode':'normal','provider':'telekom_private',
             'phone_number':number,'auth_mode':'access',**changes}
 
 
 def test_multiple_numbers_have_isolated_incoming_and_outbound():
-    cfg=validate(valid(lines=[line(),line('second','+4921611234568',incoming_mode='reject')]))
+    cfg=validate(valid(lines=[line(),line('second','+4900001234568',incoming_mode='reject')]))
     files=asterisk_files(cfg,'fake-ami')
     assert files['pjsip.conf'].count('type=registration')==2
     assert files['pjsip.conf'].count('type=identify')==1  # One identify per shared provider, no ambiguous IP routing.
     dial=files['extensions.conf']
-    assert 'exten => +4921611234567,1,Goto(incoming-main,s,1)' in dial
-    assert 'exten => +4921611234568,1,Goto(incoming-second,s,1)' in dial
+    assert 'exten => +4900001234567,1,Goto(incoming-main,s,1)' in dial
+    assert 'exten => +4900001234568,1,Goto(incoming-second,s,1)' in dial
     assert '[incoming-second]\nexten => s,1,Hangup(21)' in dial
     assert '[from-out-second]' not in dial
     assert 'Goto(from-out-main,${EXTEN},1)' in dial
@@ -242,14 +242,14 @@ def test_multiple_numbers_have_isolated_incoming_and_outbound():
 
 
 @pytest.mark.parametrize('lines,outbound', [
-    ([line(),line('main','+4921611234568')],'main'),
+    ([line(),line('main','+4900001234568')],'main'),
     ([line(),line('second')],'main'),
     ([line()], 'missing'),([line(incoming_mode='reject')],'main'),
     ([line(id='main\n[evil]')], 'main'),
     ([line(incoming_mode='announcement')], 'main'),
     ([line(label='bad\nname')],'main'),([line(enabled='true')],'main'),
     ([line(provider='sipgate',auth_mode='password',auth_username='_X.',auth_password='fake')],'main'),
-    ([line(),line('second','+4921611234568',provider='sipgate',auth_mode='access')],'main'),
+    ([line(),line('second','+4900001234568',provider='sipgate',auth_mode='access')],'main'),
 ])
 def test_bad_multiline_configuration_rejected(lines,outbound):
     with pytest.raises(ValueError):
@@ -259,12 +259,12 @@ def test_bad_multiline_configuration_rejected(lines,outbound):
 def test_shared_sip_user_requires_unique_contact_and_client():
     shared={'provider':'custom','auth_mode':'password','auth_username':'fake','auth_password':'fake-secret','registrar':'sip.example.net'}
     with pytest.raises(ValueError):
-        validate(valid(lines=[line(**shared),line('second','+4921611234568',**shared)]))
+        validate(valid(lines=[line(**shared),line('second','+4900001234568',**shared)]))
 
 
 def test_nested_passwords_redacted_and_preserved_by_line_id(tmp_path):
     settings=Settings(tmp_path)
-    settings.save(valid(lines=[line(auth_mode='password',auth_username='fake@t-online.de',auth_password='one-secret'),line('second','+4921611234568',auth_mode='password',auth_username='other@t-online.de',auth_password='two-secret')]))
+    settings.save(valid(lines=[line(auth_mode='password',auth_username='fake@t-online.de',auth_password='one-secret'),line('second','+4900001234568',auth_mode='password',auth_username='other@t-online.de',auth_password='two-secret')]))
     data=settings.public()
     assert 'one-secret' not in json.dumps(data) and 'two-secret' not in json.dumps(data)
     assert all('auth_password' not in item for item in data['lines'])
@@ -290,10 +290,10 @@ def test_incoming_only_configuration_can_disable_outbound():
 
 def test_cli_registration_status_and_originate_context(tmp_path,monkeypatch):
     from pbx import Pbx
-    settings=Settings(tmp_path);settings.save(valid(lines=[line(),line('second','+4921611234568')]))
+    settings=Settings(tmp_path);settings.save(valid(lines=[line(),line('second','+4900001234568')]))
     pbx=Pbx(settings)
     pbx.process=type('Alive',(),{'poll':lambda self:None})()
-    monkeypatch.setattr(pbx,'cli',lambda command:'line-main-registration/sip:tel.t-online.de anonymous Registered\nline-second-registration/sip:tel.t-online.de anonymous Rejected' if 'registrations' in command else '100/sip:100@192.168.2.30 hash NonQual')
+    monkeypatch.setattr(pbx,'cli',lambda command:'line-main-registration/sip:tel.t-online.de anonymous Registered\nline-second-registration/sip:tel.t-online.de anonymous Rejected' if 'registrations' in command else '100/sip:100@10.99.0.30 hash NonQual')
     state=pbx.status()
     assert state['provider_registered'] and state['phone_registered']
     assert state['lines'][1]['state']=='abgelehnt' and not state['lines'][1]['registered']
@@ -309,12 +309,12 @@ def test_callback_cannot_select_incoming_only_line(instance):
 
 
 def test_announcement_number_is_separate_and_callers_are_gated():
-    cfg=validate(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'],announcement_auto_answer=True,announcement_pin='123456',announcement_max_seconds=90)]))
+    cfg=validate(valid(lines=[line(),line('page','+4900001234568',incoming_mode='announcement',announcement_callers=['+4900011234567'],announcement_auto_answer=True,announcement_pin='123456',announcement_max_seconds=90)]))
     dial=asterisk_files(cfg,'fake')['extensions.conf']
     normal=dial.split('[incoming-main]')[1].split('[incoming-page]')[0]
     page=dial.split('[incoming-page]')[1].split('[kiosk-auto-answer]')[0]
     assert 'Dial(PJSIP/100,45)' in normal and 'Page(' not in normal
-    assert 'GotoIf($["${KIOSK_CALLER}" = "+491701234567"]?authorized)' in page
+    assert 'GotoIf($["${KIOSK_CALLER}" = "+4900011234567"]?authorized)' in page
     assert 'Read(KIOSK_PIN,,6,,1,15)' in page and '"123456"' in page
     assert 'TIMEOUT(absolute)=90' in page and 'GROUP_COUNT' in page
     assert 'Page(PJSIP/100,qsib(kiosk-auto-answer^s^1),30)' in page
@@ -324,7 +324,7 @@ def test_announcement_number_is_separate_and_callers_are_gated():
 
 @pytest.mark.parametrize('changes', [
     {'announcement_callers':[]},{'announcement_callers':['anonymous']},
-    {'announcement_callers':['+49170\nAction: Command']},{'announcement_callers':'all'},
+    {'announcement_callers':['+490001\nAction: Command']},{'announcement_callers':'all'},
     {'announcement_pin':'12'},{'announcement_pin':'123456\n'},
     {'announcement_auto_answer':'true'},{'announcement_max_seconds':0},
     {'announcement_max_seconds':True},{'announcement_max_seconds':601},
@@ -332,12 +332,12 @@ def test_announcement_number_is_separate_and_callers_are_gated():
 ])
 def test_invalid_announcement_rules_rejected(changes):
     with pytest.raises(ValueError):
-        validate(valid(lines=[line(),line('page','+4921611234568',**{'incoming_mode':'announcement','announcement_callers':['+491701234567'],**changes})]))
+        validate(valid(lines=[line(),line('page','+4900001234568',**{'incoming_mode':'announcement','announcement_callers':['+4900011234567'],**changes})]))
 
 
 def test_optional_pin_redaction_preservation_and_removal(tmp_path):
     settings=Settings(tmp_path)
-    settings.save(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'],announcement_pin='654321')]))
+    settings.save(valid(lines=[line(),line('page','+4900001234568',incoming_mode='announcement',announcement_callers=['+4900011234567'],announcement_pin='654321')]))
     assert '654321' not in json.dumps(settings.public())
     public=settings.public()['lines']
     body=[{k:v for k,v in l.items() if k not in {'auth_password_set','announcement_pin_set'}} for l in public]
@@ -348,14 +348,14 @@ def test_optional_pin_redaction_preservation_and_removal(tmp_path):
 
 
 def test_auto_answer_can_be_disabled():
-    cfg=validate(valid(lines=[line(),line('page','+4921611234568',incoming_mode='announcement',announcement_callers=['+491701234567'])]))
+    cfg=validate(valid(lines=[line(),line('page','+4900001234568',incoming_mode='announcement',announcement_callers=['+4900011234567'])]))
     page=asterisk_files(cfg,'fake')['extensions.conf'].split('[incoming-page]')[1].split('[kiosk-auto-answer]')[0]
     assert 'Page(PJSIP/100,qsi,30)' in page and 'b(kiosk-auto-answer' not in page
 
 
 def test_kiosk_cards_are_contacts_and_do_not_originate_calls(instance):
     settings,pbx,app=instance
-    settings.save({'contacts':[{'name':'Flur','number':'+4921611234500','kind':'kiosk','room':'Erdgeschoss','favorite':True},{'name':'Max','number':'+491701234567'}]})
+    settings.save({'contacts':[{'name':'Flur','number':'+4900001234500','kind':'kiosk','room':'Erdgeschoss','favorite':True},{'name':'Max','number':'+4900011234567'}]})
     client=app.test_client()
     contacts=trusted(client,'GET','/api/contacts').json
     assert contacts[0]['kind']=='kiosk' and contacts[0]['room']=='Erdgeschoss' and contacts[0]['favorite']
@@ -377,7 +377,7 @@ def test_real_ami_request_uses_selected_outbound_context(tmp_path, monkeypatch):
     import socket
     import threading
     from pbx import Pbx
-    settings=Settings(tmp_path);settings.save(valid(lines=[line(),line('second','+4921611234568')]))
+    settings=Settings(tmp_path);settings.save(valid(lines=[line(),line('second','+4900001234568')]))
     listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen(1);listener.settimeout(3)
     real_connect=socket.create_connection
     captured=[]
@@ -397,9 +397,9 @@ def test_real_ami_request_uses_selected_outbound_context(tmp_path, monkeypatch):
                     peer.sendall(b'Response: Success\r\nMessage: accepted\r\n\r\n')
     thread=threading.Thread(target=handle);thread.start()
     monkeypatch.setattr('pbx.socket.create_connection',lambda address,timeout:real_connect(listener.getsockname(),timeout))
-    response=Pbx(settings).originate('+491701234567','second')
+    response=Pbx(settings).originate('+4900011234567','second')
     thread.join(4);assert not thread.is_alive()
     assert captured[0]['Action']=='Login' and captured[0]['Events']=='off'
     assert captured[1]['Channel']=='PJSIP/100' and captured[1]['Context']=='from-out-second'
-    assert captured[1]['Exten']=='+491701234567' and captured[1]['Async']=='true'
+    assert captured[1]['Exten']=='+4900011234567' and captured[1]['Async']=='true'
     assert settings.ami_secret not in json.dumps(response)

@@ -1,3 +1,11 @@
+# 26.10.7
+
+- Allgemeine HAOS-Anleitung ohne persönliche Hardwarebezüge.
+- Neutrale Eingabehinweise statt ortsbezogener Rufnummern- und Netzbeispiele.
+- Tests verwenden ausdrücklich fiktive Rufnummern und ein unabhängiges Testnetz.
+- Standalone-Gateway startet ohne voreingestellten Beispielkontakt.
+- Bestehende lokale Anschlussdaten werden nicht verändert.
+
 # 26.10.6
 
 - HA-Ingress nutzt den Supervisor-Port statt fest 8099; behebt `Address in use` beim Start im Host-Netzwerk.

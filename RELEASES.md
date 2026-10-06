@@ -11,6 +11,8 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 | 5 | [26.10.5](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.5) | Kontakte als Kiosk-/Raumkarten, Favoriten, Suche und vollständige Anleitung |
 | Korrektur | [26.10.6](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.6) | Dynamischer HA-Ingress-Port und erreichbare Einrichtung bei SIP-/LAN-Portkonflikten |
 
+| Bereinigung | [26.10.7](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.7) | Allgemeine Dokumentation und neutrale Beispiele |
+
 ## Installieren und aktualisieren
 
 Repository-URL für **Kiosk Satellite → Plugin-Manager → Repository hinzufügen**:
@@ -45,7 +47,7 @@ Der Upload erfolgt nach Prüfung der ZIP: genau Manifest, `plugin.jar` mit Andro
 - Auto-Answer-Header nur auf der Durchsage, tatsächliche RTP-Übertragung zum Ziel und stummes Zielmikrofon.
 - Kontakt-/Kiosk-Karten und JavaScript-Syntax.
 
-Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwendet. Es wird kein externer Testanruf gewählt. Die unterschiedlichen realen Anbieteranschlüsse, Router-NAT, das Header-Auto-Answer deines Geräts und Home-Assistant-Supervisor auf deinem DXP2800 müssen vor Ort geprüft werden.
+Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwendet. Es wird kein externer Testanruf gewählt. Die unterschiedlichen realen Anbieteranschlüsse, Router-NAT, das Header-Auto-Answer deines Geräts und Home-Assistant-Supervisor auf dem eingesetzten HAOS-System müssen vor Ort geprüft werden.
 
 ## Verbleibende Grenze
 
