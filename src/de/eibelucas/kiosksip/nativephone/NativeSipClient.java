@@ -7,7 +7,7 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** Experimental single-dialog SIP endpoint for a directly attached LAN Asterisk.
+/** Experimental single-dialog SIP endpoint per kiosk for a directly attached LAN Asterisk.
  * The worker owns SIP, timers and media. UI commands only enqueue work.
  * No AMI Originate, intercom invitation or auto-answer setting is involved.
  */
@@ -26,14 +26,18 @@ public final class NativeSipClient {
     }
     public interface MediaFactory { Media open(InetAddress local) throws Exception; }
     public static final class Config {
-        public final String server, password;
+        public final String server, user, password;
         public final int port, localPort;
         public Config(String server, int port, String password, int localPort) {
+            this(server,port,"100",password,localPort);
+        }
+        public Config(String server, int port, String user, String password, int localPort) {
+            if(user==null||!user.matches("1[0-9]{2}"))throw new IllegalArgumentException("Nebenstelle von 100 bis 199 eingeben.");
             if (server == null || !server.matches("[a-zA-Z0-9.-]{1,253}") || server.startsWith("-") ||
                     port < 1 || port > 65535 || localPort < 1024 || localPort > 65535 ||
                     password == null || password.length() < 8 || password.length() > 256 ||
-                    password.matches("(?s).*[\\p{Cntrl}].*")) throw new IllegalArgumentException("SIP-Adresse, Ports und Telefon-100-Passwort prüfen.");
-            this.server=server; this.port=port; this.password=password; this.localPort=localPort;
+                    password.matches("(?s).*[\\p{Cntrl}].*")) throw new IllegalArgumentException("SIP-Adresse, Ports und Geräte-SIP-Passwort prüfen.");
+            this.server=server; this.user=user; this.port=port; this.password=password; this.localPort=localPort;
         }
     }
     private static final class Dialog {
@@ -77,7 +81,7 @@ public final class NativeSipClient {
     public void start() { if(running)return;running=true;worker=new Thread(this::run,"native-sip-lab");worker.setDaemon(true);worker.start(); }
     public void dial(String number) {
         if(number==null||!number.matches("\\+?[0-9*#]{3,20}"))throw new IllegalArgumentException("Nummer: 3 bis 20 Ziffern, optional +, * oder #.");
-        if(!running||!registered)throw new IllegalStateException("Telefon 100 ist noch nicht angemeldet.");
+        if(!running||!registered)throw new IllegalStateException("Das Gerät ist noch nicht angemeldet.");
         commands.add(()->begin(number));
     }
     public void answer() { commands.add(this::accept); }
@@ -132,14 +136,14 @@ public final class NativeSipClient {
         regSeq++;regBranch=branch();String uri="sip:"+cfg.server;
         String auth=challenge==null?"":auth(challenge,"REGISTER",uri);
         regAuthorized=challenge!=null;
-        regRequest=headers("REGISTER",uri,regBranch,"<sip:100@"+cfg.server+">;tag="+regTag,"<sip:100@"+cfg.server+">",regId,regSeq)+
+        regRequest=headers("REGISTER",uri,regBranch,"<sip:"+cfg.user+"@"+cfg.server+">;tag="+regTag,"<sip:"+cfg.user+"@"+cfg.server+">",regId,regSeq)+
                 "Expires: 120\r\n"+auth+"Content-Length: 0\r\n\r\n";
         long now=System.nanoTime()/1_000_000;regDeadline=now+8000;regInterval=500;regRetryAt=now+500;registerAt=now+60000;send(regRequest);
     }
     private void begin(String number) {
         if(dialog!=null){notifyCall("busy",number,"Es läuft bereits ein Anruf.");return;}
         if(!registered){notifyCall("error",number,"SIP nicht angemeldet.");return;}
-        Dialog d=new Dialog();d.outgoing=true;d.id=id();d.from="<sip:100@"+cfg.server+">;tag="+id();
+        Dialog d=new Dialog();d.outgoing=true;d.id=id();d.from="<sip:"+cfg.user+"@"+cfg.server+">;tag="+id();
         // # is escaped in a SIP URI; Asterisk decodes the destination user.
         d.uri="sip:"+number.replace("#","%23")+"@"+cfg.server;d.to="<"+d.uri+">";d.branch=branch();
         dialog=d;
@@ -229,10 +233,10 @@ public final class NativeSipClient {
     private boolean dialogMatches(SipMessage m,Dialog d){String from=d.outgoing?d.to:d.from,to=d.outgoing?d.from:d.to;return tag(from).equals(tag(m.header("from")))&&tag(to).equals(tag(m.header("to")));}
     private String tag(String value){if(value==null)return "";int p=value.indexOf(";tag=");return p<0?"":value.substring(p+5).split("[;\\s]",2)[0];}
     private String contact(String value){if(value==null||value.indexOf('\r')>=0||value.indexOf('\n')>=0)return null;int a=value.indexOf('<'),b=value.indexOf('>');String uri=a>=0&&b>a?value.substring(a+1,b):value.split(";",2)[0].trim();return uri.matches("sip:[a-zA-Z0-9_.!~*'()%+@;=:-]+")?uri:null;}
-    private String headers(String method,String uri,String branch,String from,String to,String id,int seq){return method+" "+uri+" SIP/2.0\r\nVia: SIP/2.0/UDP "+local.getHostAddress()+":"+cfg.localPort+";branch="+branch+";rport\r\nMax-Forwards: 70\r\nFrom: "+from+"\r\nTo: "+to+"\r\nCall-ID: "+id+"\r\nCSeq: "+seq+" "+method+"\r\nContact: <sip:100@"+local.getHostAddress()+":"+cfg.localPort+">\r\nAllow: INVITE, ACK, CANCEL, BYE, OPTIONS\r\nUser-Agent: Kiosk-SIP-Native-Lab\r\n";}
-    private String reply(SipMessage m,int code,String reason,String to,String sdp){StringBuilder out=new StringBuilder("SIP/2.0 "+code+" "+reason+"\r\n");for(String via:m.all("via"))out.append("Via: ").append(via).append("\r\n");out.append("From: ").append(m.header("from")).append("\r\nTo: ").append(to).append("\r\nCall-ID: ").append(m.header("call-id")).append("\r\nCSeq: ").append(m.header("cseq")).append("\r\nContact: <sip:100@").append(local.getHostAddress()).append(':').append(cfg.localPort).append(">\r\n");return out+body(sdp);}
+    private String headers(String method,String uri,String branch,String from,String to,String id,int seq){return method+" "+uri+" SIP/2.0\r\nVia: SIP/2.0/UDP "+local.getHostAddress()+":"+cfg.localPort+";branch="+branch+";rport\r\nMax-Forwards: 70\r\nFrom: "+from+"\r\nTo: "+to+"\r\nCall-ID: "+id+"\r\nCSeq: "+seq+" "+method+"\r\nContact: <sip:"+cfg.user+"@"+local.getHostAddress()+":"+cfg.localPort+">\r\nAllow: INVITE, ACK, CANCEL, BYE, OPTIONS\r\nUser-Agent: Kiosk-SIP-Native-Lab\r\n";}
+    private String reply(SipMessage m,int code,String reason,String to,String sdp){StringBuilder out=new StringBuilder("SIP/2.0 "+code+" "+reason+"\r\n");for(String via:m.all("via"))out.append("Via: ").append(via).append("\r\n");out.append("From: ").append(m.header("from")).append("\r\nTo: ").append(to).append("\r\nCall-ID: ").append(m.header("call-id")).append("\r\nCSeq: ").append(m.header("cseq")).append("\r\nContact: <sip:").append(cfg.user).append('@').append(local.getHostAddress()).append(':').append(cfg.localPort).append(">\r\n");return out+body(sdp);}
     private String body(String sdp){return (sdp.isEmpty()?"":"Content-Type: application/sdp\r\n")+"Content-Length: "+sdp.getBytes(StandardCharsets.UTF_8).length+"\r\n\r\n"+sdp;}
-    private String auth(SipMessage challenge,String method,String uri){String value=challenge.header(challenge.status()==407?"proxy-authenticate":"www-authenticate");if(value==null||!value.startsWith("Digest "))throw new IllegalArgumentException("Digest challenge fehlt");Map<String,String> p=SipDigest.parseParams(value);String realm=p.get("realm"),nonce=p.get("nonce"),qop=null;if(realm==null||nonce==null||!p.getOrDefault("algorithm","MD5").equalsIgnoreCase("MD5"))throw new IllegalArgumentException("Nicht unterstützte SIP-Anmeldung");if(p.containsKey("qop")){for(String q:p.get("qop").split(","))if(q.trim().equals("auth"))qop="auth";if(qop==null)throw new IllegalArgumentException("qop nicht unterstützt");}String cnonce=id(),nc="00000001";String result=(challenge.status()==407?"Proxy-Authorization":"Authorization")+": Digest username=\"100\", realm=\""+quote(realm)+"\", nonce=\""+quote(nonce)+"\", uri=\""+uri+"\", response=\""+SipDigest.response("100",realm,cfg.password,method,uri,nonce,qop,nc,cnonce)+"\", algorithm=MD5";if(qop!=null)result+=", qop=auth, nc="+nc+", cnonce=\""+cnonce+"\"";if(p.containsKey("opaque"))result+=", opaque=\""+quote(p.get("opaque"))+"\"";return result+"\r\n";}
+    private String auth(SipMessage challenge,String method,String uri){String value=challenge.header(challenge.status()==407?"proxy-authenticate":"www-authenticate");if(value==null||!value.startsWith("Digest "))throw new IllegalArgumentException("Digest challenge fehlt");Map<String,String> p=SipDigest.parseParams(value);String realm=p.get("realm"),nonce=p.get("nonce"),qop=null;if(realm==null||nonce==null||!p.getOrDefault("algorithm","MD5").equalsIgnoreCase("MD5"))throw new IllegalArgumentException("Nicht unterstützte SIP-Anmeldung");if(p.containsKey("qop")){for(String q:p.get("qop").split(","))if(q.trim().equals("auth"))qop="auth";if(qop==null)throw new IllegalArgumentException("qop nicht unterstützt");}String cnonce=id(),nc="00000001";String result=(challenge.status()==407?"Proxy-Authorization":"Authorization")+": Digest username=\""+cfg.user+"\", realm=\""+quote(realm)+"\", nonce=\""+quote(nonce)+"\", uri=\""+uri+"\", response=\""+SipDigest.response(cfg.user,realm,cfg.password,method,uri,nonce,qop,nc,cnonce)+"\", algorithm=MD5";if(qop!=null)result+=", qop=auth, nc="+nc+", cnonce=\""+cnonce+"\"";if(p.containsKey("opaque"))result+=", opaque=\""+quote(p.get("opaque"))+"\"";return result+"\r\n";}
     private String quote(String value){return value.replace("\\","\\\\").replace("\"","\\\"").replace("\r","").replace("\n","");}
     private void send(String message)throws Exception {byte[] bytes=message.getBytes(StandardCharsets.UTF_8);socket.send(new DatagramPacket(bytes,bytes.length,target));}
     private String id(){byte[] bytes=new byte[12];random.nextBytes(bytes);StringBuilder s=new StringBuilder();for(byte b:bytes)s.append(String.format("%02x",b&255));return s.toString();}

@@ -20,13 +20,13 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
     private void read(String command,String kind){PluginHost h=host;try{h.executeCommand(command,Collections.emptyMap(),(ok,data,error)->{if(h==host&&ok&&data instanceof Map)main.post(()->{if(h==host)observe(kind,(Map<?,?>)data);});});}catch(Exception ignored){}}
     public void configure(Map<String,Object> settings){
         final int rev=++generation;NativeSipClient old=client;client=null;if(old!=null)old.stop();
-        final String server=text(settings,"server",""),password=text(settings,"password","");
+        final String server=text(settings,"server",""),password=text(settings,"password",""),extension=text(settings,"extension","100");
         final int port=integer(settings,"port",5070),localPort=integer(settings,"localPort",5090),bottom=Math.max(12,Math.min(300,integer(settings,"bottomOffset",88)));
         final String side="left".equals(text(settings,"side","right"))?OverlaySpec.BOTTOM_LEFT:OverlaySpec.BOTTOM_RIGHT;
-        main.post(()->{if(rev!=generation||host==null)return;model.registered=false;model.update("idle","","SIP einrichten: HA-IP und Telefon-100-Passwort.");if(view==null)view=new FloatingDialer(model,this);try{host.showOverlay("native_phone",OverlaySpec.at(side).inset(12,12,12,bottom).onTop(true).closeOnBack(false),view);}catch(Exception e){host.status("Native Overlays fehlen. Kiosk Satellite aktualisieren.",true);}});
+        main.post(()->{if(rev!=generation||host==null)return;model.registered=false;model.update("idle","","SIP einrichten: HA-IP, eigene Nebenstelle und SIP-Passwort.");if(view==null)view=new FloatingDialer(model,this);try{host.showOverlay("native_phone",OverlaySpec.at(side).inset(12,12,12,bottom).onTop(true).closeOnBack(false),view);}catch(Exception e){host.status("Native Overlays fehlen. Kiosk Satellite aktualisieren.",true);}});
         try{
-            NativeSipClient fresh=new NativeSipClient(new NativeSipClient.Config(server,port,password,localPort),new NativeSipClient.Events(){
-                public void registration(boolean ready){main.post(()->{if(rev!=generation||host==null)return;model.registered=ready;if(!model.active())model.detail=ready?"Bereit · Hauptrufnummer":"SIP nicht angemeldet";refresh();});}
+            NativeSipClient fresh=new NativeSipClient(new NativeSipClient.Config(server,port,extension,password,localPort),new NativeSipClient.Events(){
+                public void registration(boolean ready){main.post(()->{if(rev!=generation||host==null)return;model.registered=ready;if(!model.active())model.detail=ready?"Bereit · Nebenstelle "+extension:"SIP nicht angemeldet";refresh();});}
                 public void call(String state,String peer,String detail){main.post(()->{if(rev!=generation||host==null)return;model.update(state,peer,detail);if(state.equals("incoming")){try{host.executeCommand("screenOn",Collections.emptyMap(),(ok,data,error)->{});}catch(Exception ignored){}}refresh();});}
             },address->new AndroidG711(address,view==null?null:view.audioContext()));
             client=fresh;fresh.start();

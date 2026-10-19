@@ -21,10 +21,12 @@ public final class NativePhoneTest {
     static String sdp(){return "v=0\r\nc=IN IP4 127.0.0.1\r\nm=audio 30000 RTP/AVP 0\r\na=rtpmap:0 PCMU/8000\r\na=sendrecv\r\n";}
     static final class Fixture implements AutoCloseable {
         DatagramSocket pbx=new DatagramSocket(new InetSocketAddress("127.0.0.1",0));
-        NativeSipClient sip;InetSocketAddress peer;List<Audio> media=new CopyOnWriteArrayList<>();List<String> states=new CopyOnWriteArrayList<>();volatile String state="idle";
-        Fixture()throws Exception{
+        NativeSipClient sip;String extension;InetSocketAddress peer;List<Audio> media=new CopyOnWriteArrayList<>();List<String> states=new CopyOnWriteArrayList<>();volatile String state="idle";
+        Fixture()throws Exception{this("100");}
+        Fixture(String extension)throws Exception{
+            this.extension=extension;
             pbx.setSoTimeout(3500);int local;try(DatagramSocket probe=new DatagramSocket(0)){local=probe.getLocalPort();}
-            sip=new NativeSipClient(new NativeSipClient.Config("127.0.0.1",pbx.getLocalPort(),"fake-phone-secret",local),new NativeSipClient.Events(){public void registration(boolean ready){}public void call(String s,String p,String d){state=s;states.add(s);}},address->{Audio a=new Audio();media.add(a);return a;});
+            sip=new NativeSipClient(new NativeSipClient.Config("127.0.0.1",pbx.getLocalPort(),extension,"fake-phone-secret",local),new NativeSipClient.Events(){public void registration(boolean ready){}public void call(String s,String p,String d){state=s;states.add(s);}},address->{Audio a=new Audio();media.add(a);return a;});
             sip.start();SipMessage register=receive("REGISTER");send(response(register,401,"Unauthorized","WWW-Authenticate: Digest realm=\"asterisk\", nonce=\"fake-register-nonce\", algorithm=MD5, qop=\"auth\"\r\n",""));
             SipMessage authenticated=receive("REGISTER");check(authenticated.header("authorization")!=null,"REGISTER has digest");check(!authenticated.header("authorization").contains("fake-phone-secret"),"password is not on wire");verifyDigest(authenticated,"REGISTER","fake-register-nonce");
             send(response(authenticated,200,"OK","Expires: 120\r\n",""));await(sip::registered,"registered");
@@ -34,10 +36,10 @@ public final class NativePhoneTest {
         public void close(){sip.stop();pbx.close();}
         String response(SipMessage request,int code,String reason,String extra,String body){return "SIP/2.0 "+code+" "+reason+"\r\nVia: "+request.header("via")+"\r\nFrom: "+request.header("from")+"\r\nTo: "+request.header("to")+(request.header("to").contains(";tag=")?"":";tag=pbx")+"\r\nCall-ID: "+request.header("call-id")+"\r\nCSeq: "+request.header("cseq")+"\r\nContact: <sip:asterisk@127.0.0.1:"+pbx.getLocalPort()+">\r\n"+extra+(body.isEmpty()?"":"Content-Type: application/sdp\r\n")+"Content-Length: "+body.getBytes(StandardCharsets.UTF_8).length+"\r\n\r\n"+body;}
         SipMessage dial()throws Exception{sip.dial("600");SipMessage invite=receive("INVITE");check(invite.startLine.startsWith("INVITE sip:600@"),"direct INVITE to local echo");check(media.get(media.size()-1).starts==0,"microphone not started before remote answer");return invite;}
-        void verifyDigest(SipMessage message,String method,String nonce){Map<String,String> p=SipDigest.parseParams(message.header("authorization"));String expected=SipDigest.response("100","asterisk","fake-phone-secret",method,p.get("uri"),nonce,p.get("qop"),p.get("nc"),p.get("cnonce"));check(expected.equals(p.get("response")),"correct digest response");}
+        void verifyDigest(SipMessage message,String method,String nonce){Map<String,String> p=SipDigest.parseParams(message.header("authorization"));check(p.get("username").equals(extension),"correct per-device digest user");String expected=SipDigest.response(extension,"asterisk","fake-phone-secret",method,p.get("uri"),nonce,p.get("qop"),p.get("nc"),p.get("cnonce"));check(expected.equals(p.get("response")),"correct digest response");}
     }
     public static void main(String[] args)throws Exception{
-        model();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();
+        model();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices();
         System.out.println("Native phone: "+assertions+" assertions passed (loopback SIP + model)");
     }
     static void model(){DialerModel m=new DialerModel();check(!m.canDial(),"unregistered cannot dial");m.registered=true;m.digit("1");m.digit("0");m.digit("1");check(m.canDial(),"registered number can dial");m.update("calling","101","Verbindet");m.expanded=false;check(m.active(),"collapse preserves call");m.digit("9");check(m.number.equals("101"),"cannot edit active number");m.update("connected","","Verbunden");long time=m.connectedAt;m.update("connected","","Verbunden");check(m.connectedAt==time,"duplicate event preserves duration");m.update("idle","","Beendet");check(m.canDial(),"call can be repeated");m.delete();check(!m.canDial(),"short invalid number rejected");}
@@ -80,4 +82,7 @@ public final class NativePhoneTest {
         check((AndroidG711.linearToA((short)1000)&255)==0xfa,"A-law positive reference vector");check((AndroidG711.linearToA((short)-1000)&255)==0x7a,"A-law negative reference vector");check((AndroidG711.linearToA((short)0)&255)==0xd5,"A-law silence reference vector");
         DialerModel m=new DialerModel();m.plus();m.digit("4");m.digit("9");m.digit("1");check(m.number.equals("+491"),"native plus prefix");
     }
+    static void independentDevices()throws Exception{try(Fixture first=new Fixture("101");Fixture second=new Fixture("102")){
+        check(first.sip.registered()&&second.sip.registered(),"two device clients registered simultaneously");first.sip.dial("102");SipMessage a=first.receive("INVITE");second.sip.dial("101");SipMessage b=second.receive("INVITE");check(a.header("from").contains("sip:101@"),"first device uses own identity");check(b.header("from").contains("sip:102@"),"second device uses own identity");check(a.header("contact").contains("sip:101@"),"first contact separated");check(b.header("contact").contains("sip:102@"),"second contact separated");check(!a.header("call-id").equals(b.header("call-id")),"devices have isolated dialogs");first.send(first.response(a,486,"Busy Here","",""));second.send(second.response(b,486,"Busy Here","",""));first.receive("ACK");second.receive("ACK");
+    }}
 }

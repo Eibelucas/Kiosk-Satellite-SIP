@@ -44,6 +44,12 @@ def main():
         'client_user':'+4900001234569', 'contact_user':'+4900001234569', 'from_user':'+4900001234569',
         'incoming_mode':'announcement', 'announcement_callers':['+4900011234567'],
         'announcement_auto_answer':True, 'announcement_max_seconds':30, 'announcement_pin':''})
+    cfg['devices'] = [dict(extension=ext, name='Fake kiosk ' + ext,
+                           password='fake-device-secret-' + ext, enabled=True) for ext in ('101', '102')]
+    cfg['lines'][0]['incoming_devices'] = ['100']
+    cfg['lines'].append({**cfg['lines'][0], 'id':'group', 'phone_number':'+4900001234570',
+                        'client_user':'+4900001234570', 'contact_user':'+4900001234570',
+                        'from_user':'+4900001234570', 'incoming_devices':['101','102']})
     # A local DNS server proves NAPTR/SRV resolution uses the configured
     # resolver, rather than relying on an A-record at a fixed SIP port.
     dns_queries=[]
@@ -162,9 +168,9 @@ def main():
             # by their called number; the secondary account is rejected, never dialed out.
             for _ in range(40):
                 result=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show registrations'],text=True)
-                if result.count(' Registered')>=3: break
+                if result.count(' Registered')>=4: break
                 time.sleep(.2)
-            assert result.count(' Registered')>=3,(result,dns_queries)
+            assert result.count(' Registered')>=4,(result,dns_queries)
             assert ('_sip._udp.sip-test.example.com',33) in dns_queries,dns_queries
             def invite(destination, expect_phone, expected_code=None, caller='+4900011234567', page=False):
                 ident=uuid.uuid4().hex
@@ -242,6 +248,69 @@ def main():
             invite('+4900001234569',False,403,caller='+4900019999999')
             invite('+4900001234569',False,403,caller='anonymous')
             invite('+4900001234569',True,page=True)
+        # Two real PJSIP endpoint registrations coexist. An external incoming
+        # call forks to both; accepting one cancels the other without auto-answer.
+        def recv_method(sock, method):
+            deadline=time.monotonic()+6
+            while time.monotonic()<deadline:
+                message=sock.recv(16384).decode()
+                if message.startswith(method+' '):return message
+            raise AssertionError('No '+method)
+        def response_to(message, code, reason, extension, sock, body=''):
+            rows=[row+';tag=device'+extension if row.startswith('To:') and ';tag=' not in row else row for row in sip_headers(message)]
+            return (f'SIP/2.0 {code} {reason}\r\n'+'\r\n'.join(rows)+
+                    f'\r\nContact: <sip:{extension}@127.0.0.1:{sock.getsockname()[1]}>\r\n'+
+                    ('Content-Type: application/sdp\r\n' if body else '')+f'Content-Length: {len(body.encode())}\r\n\r\n'+body)
+        def register_device(sock, extension):
+            ident=uuid.uuid4().hex;port=sock.getsockname()[1];uri='sip:127.0.0.1:15070'
+            def request(seq,auth=''):
+                return (f'REGISTER {uri} SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:{port};branch=z9hG4bK{uuid.uuid4().hex};rport\r\nMax-Forwards: 70\r\nFrom: <sip:{extension}@127.0.0.1>;tag={ident}\r\nTo: <sip:{extension}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: {seq} REGISTER\r\nContact: <sip:{extension}@127.0.0.1:{port}>\r\nExpires: 120\r\n{auth}Content-Length: 0\r\n\r\n')
+            sock.sendto(request(1).encode(),('127.0.0.1',15070));challenge=sock.recv(16384).decode()
+            assert challenge.startswith('SIP/2.0 401'),challenge
+            values=dict(re.findall(r'([a-z_]+)="([^"]+)"',challenge,re.I));realm,nonce=values['realm'],values['nonce']
+            md5=lambda text:hashlib.md5(text.encode()).hexdigest();cnonce=uuid.uuid4().hex;nc='00000001'
+            ha1=md5(f'{extension}:{realm}:fake-device-secret-{extension}');ha2=md5(f'REGISTER:{uri}')
+            digest=md5(f'{ha1}:{nonce}:{nc}:{cnonce}:auth:{ha2}') if 'qop' in values else md5(f'{ha1}:{nonce}:{ha2}')
+            auth=f'Authorization: Digest username="{extension}", realm="{realm}", nonce="{nonce}", uri="{uri}", response="{digest}", algorithm=MD5'
+            if 'qop' in values:auth+=f', qop=auth, nc={nc}, cnonce="{cnonce}"'
+            sock.sendto(request(2,auth+'\r\n').encode(),('127.0.0.1',15070));answer=sock.recv(16384).decode()
+            assert answer.startswith('SIP/2.0 200'),answer
+        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as first, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as second:
+            for device_socket,extension in ((first,'101'),(second,'102')):
+                device_socket.bind(('127.0.0.1',0));device_socket.settimeout(6);register_device(device_socket,extension)
+            contacts=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show contacts'],text=True)
+            assert all(ext+'/sip:'+ext+'@' in contacts for ext in ('100','101','102')),contacts
+            ident=uuid.uuid4().hex;destination='+4900001234570'
+            sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Group test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
+            request=(f'INVITE sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{ident};rport\r\nMax-Forwards: 70\r\nFrom: <sip:+4900011234567@127.0.0.1>;tag={ident}\r\nTo: <sip:{destination}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: 1 INVITE\r\nContact: <sip:fake@127.0.0.1:15071>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}')
+            registrar.sendto(request.encode(),('127.0.0.1',15070))
+            invite_first=recv_method(first,'INVITE');invite_second=recv_method(second,'INVITE')
+            assert 'sip:101@' in invite_first.splitlines()[0] and 'sip:102@' in invite_second.splitlines()[0]
+            assert 'answer-after=0' not in invite_first and 'answer-after=0' not in invite_second
+            second.sendto(response_to(invite_second,180,'Ringing','102',second).encode(),('127.0.0.1',15070))
+            first.sendto(response_to(invite_first,200,'OK','101',first,sdp.replace('41000','42002')).encode(),('127.0.0.1',15070))
+            cancel=recv_method(second,'CANCEL')
+            second.sendto(response_to(cancel,200,'OK','102',second).encode(),('127.0.0.1',15070))
+            second.sendto(response_to(invite_second,487,'Request Terminated','102',second).encode(),('127.0.0.1',15070))
+            deadline=time.monotonic()+6;answer=''
+            while time.monotonic()<deadline:
+                item=responses.get(timeout=6)
+                if f'Call-ID: {ident}' in item and item.startswith('SIP/2.0 200'):
+                    answer=item;break
+            assert answer,'Ring group did not connect to provider'
+            def provider_dialog(method,seq):
+                rows=[row for row in sip_headers(answer) if not row.startswith(('Via:','CSeq:'))]
+                wire=f'{method} sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{uuid.uuid4().hex};rport\r\n'+'\r\n'.join(rows)+f'\r\nCSeq: {seq} {method}\r\nMax-Forwards: 70\r\nContent-Length: 0\r\n\r\n'
+                registrar.sendto(wire.encode(),('127.0.0.1',15070))
+            provider_dialog('ACK',1);recv_method(first,'ACK')
+            provider_dialog('BYE',2);bye=recv_method(first,'BYE')
+            first.sendto(response_to(bye,200,'OK','101',first).encode(),('127.0.0.1',15070))
+            for _ in range(30):
+                channels=subprocess.check_output(['asterisk','-C',astconf,'-rx','core show channels concise'],text=True)
+                if not any('PJSIP/'+ext+'-' in channels for ext in ('101','102')):break
+                time.sleep(.1)
+            assert not any('PJSIP/'+ext+'-' in channels for ext in ('101','102')),channels
+            print('PASS: independent 101/102 registrations, external ring group, explicit answer, losing kiosk CANCEL and clean hangup.')
         dialplan = subprocess.check_output(["asterisk", "-C", astconf, "-rx", "dialplan show 600@from-phone"], text=True)
         assert "Echo()" in dialplan, dialplan
         print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, local DNS SRV resolution, three fake provider registrations, isolated incoming routing, announcement allowlist, Auto-Answer headers and one-way RTP audio and echo dialplan. No external call made.")
