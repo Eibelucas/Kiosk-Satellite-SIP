@@ -2,7 +2,8 @@ name: Build Kiosk Satellite plugin
 
 on:
   push:
-    branches: [main]
+    branches: [main, native-dialer-lab]
+  pull_request:
   workflow_dispatch:
     inputs:
       release_tag:
@@ -30,6 +31,8 @@ jobs:
       - uses: android-actions/setup-android@v4
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Native dialer protocol and controller tests (no external calls)
+        run: python3 tools/test_native.py
       - name: Build plugin
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}

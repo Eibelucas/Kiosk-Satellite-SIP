@@ -1,5 +1,7 @@
 # Kiosk Satellite SIP
 
+> **Entwicklungszweig `native-dialer-lab`:** Dieser Branch baut das separate experimentelle Plugin **SIP Native Dialer Lab** mit schwebendem Telefonknopf, nativem Dialer und direkten SIP-Anrufen ohne Rückruf-Annahme. **[Versuch, Installation, Prüfungen und offene Grenzen](native-lab/README.md)**. Der folgende Text beschreibt die bisherige stabile Variante.
+
 Telefonseite ab **26.10.11**: **Telefon öffnen** startet mit den Wähltasten. **Kontakte öffnen** öffnet direkt Kontakte und Favoriten im Plugin. Ein Kontakt trägt die Nummer ein; erst **Anrufen** mit Bestätigung fordert den Anruf an. Die native KS-Gegensprechliste enthält weiterhin Kiosk-Geräte. SDK 1 hat keine Schnittstelle zum Eintragen von SIP-Telefonkontakten; dafür ist eine Änderung an Kiosk Satellite erforderlich.
 
 ## Auf deinem HAOS installieren

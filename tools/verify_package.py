@@ -11,7 +11,9 @@ root = Path(__file__).resolve().parents[1]
 dist = root / 'dist'
 manifest_bytes = (dist / 'kiosk-satellite-plugin.json').read_bytes()
 manifest = json.loads(manifest_bytes)
-assert re.fullmatch(r'\d+\.\d+\.\d+', manifest['version'])
+assert re.fullmatch(r'\d+\.\d+\.\d+(?:-lab\.\d+)?', manifest['version'])
+if '-lab.' in manifest['version']:
+    assert manifest['id'] == 'kiosk-satellite-sip-native-lab'
 package = dist / f"{manifest['id']}-{manifest['version']}.zip"
 assert package.stat().st_size <= 4 * 1024 * 1024
 with zipfile.ZipFile(package) as archive:
