@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import zipfile
+from plugin_contract import validate_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BYTES = 4 * 1024 * 1024
@@ -20,6 +21,7 @@ manifest_path = ROOT / 'kiosk-satellite-plugin.json'
 manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
 if args.version:
     manifest['version'] = args.version
+validate_manifest(manifest)
 manifest_bytes = (json.dumps(manifest, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
 
 sdk_root = Path(os.environ.get('ANDROID_HOME', os.environ.get('ANDROID_SDK_ROOT', str(Path.home() / 'android-sdk'))))

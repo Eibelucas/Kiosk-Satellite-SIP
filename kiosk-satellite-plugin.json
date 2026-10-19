@@ -3,10 +3,10 @@
   "apiVersion": 1,
   "id": "kiosk-satellite-sip-native-lab",
   "name": "SIP Native Dialer Lab",
-  "version": "26.10.13-lab.1",
+  "version": "26.10.13-lab.2",
   "minAndroidSdk": 24,
   "entryClass": "de.eibelucas.kiosksip.nativephone.NativePhonePlugin",
-  "description": "Experimenteller nativer Telefonknopf mit ausklappbarem Dialer und direktem SIP-Anruf über Asterisk-Nebenstelle 100.",
+  "description": "Experimenteller nativer Telefonknopf mit ausklappbarem Dialer und direktem SIP-Anruf �ber Asterisk-Nebenstelle 100.",
   "author": "Eibelucas",
   "license": "Apache-2.0",
   "capabilities": [
@@ -34,6 +34,7 @@
       "key": "password",
       "title": "SIP-Passwort von Telefon 100",
       "type": "secret",
+      "default": "",
       "group": "Telefon 100",
       "description": "Das lokale Telefon-Passwort aus der HA-Einrichtung. Nicht das Anbieter- oder Web-Passwort."
     },
@@ -61,7 +62,7 @@
       "type": "string",
       "default": "88",
       "group": "Telefonknopf",
-      "description": "Platz für die Navbar lassen. 12 bis 300."
+      "description": "Platz f�r die Navbar lassen. 12 bis 300."
     }
   ],
   "commands": [
@@ -71,11 +72,11 @@
     },
     {
       "id": "openPhone",
-      "title": "Nativen Dialer öffnen"
+      "title": "Nativen Dialer �ffnen"
     },
     {
       "id": "hangup",
-      "title": "Gespräch beenden"
+      "title": "Gespr�ch beenden"
     }
   ]
 }

@@ -6,11 +6,13 @@ import json
 from pathlib import Path
 import re
 import zipfile
+from plugin_contract import validate_manifest
 
 root = Path(__file__).resolve().parents[1]
 dist = root / 'dist'
 manifest_bytes = (dist / 'kiosk-satellite-plugin.json').read_bytes()
 manifest = json.loads(manifest_bytes)
+validate_manifest(manifest)
 assert re.fullmatch(r'\d+\.\d+\.\d+(?:-lab\.\d+)?', manifest['version'])
 if '-lab.' in manifest['version']:
     assert manifest['id'] == 'kiosk-satellite-sip-native-lab'
