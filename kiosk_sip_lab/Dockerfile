@@ -1,0 +1,14 @@
+FROM alpine:3.23
+RUN apk add --no-cache asterisk python3 py3-pip \
+    && python3 -m venv /opt/venv
+COPY requirements.txt /tmp/requirements.txt
+RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+COPY app /app
+LABEL org.opencontainers.image.title="SIP Phone UI Lab" \
+      org.opencontainers.image.source="https://github.com/Eibelucas/Kiosk-Satellite-SIP" \
+      org.opencontainers.image.licenses="Apache-2.0"
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s \
+  CMD /opt/venv/bin/python -c 'import socket; socket.create_connection(("127.0.0.1", int(open("/run/kiosk-sip-ingress-port").read())), timeout=3).close()' || exit 1
+CMD ["/opt/venv/bin/python", "/app/run.py"]

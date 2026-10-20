@@ -1,0 +1,52 @@
+name: Test SIP UI Lab
+on:
+  push:
+    branches: [main]
+    paths: ['kiosk_sip_lab/**', 'lab_tests/**', '.github/workflows/test-ui-lab.yml']
+  pull_request:
+    paths: ['kiosk_sip_lab/**', 'lab_tests/**', '.github/workflows/test-ui-lab.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r kiosk_sip_lab/requirements.txt pytest PyYAML
+      - name: Draft, API, secrets and isolation tests
+        run: python -m pytest lab_tests/test_lab.py -q
+      - name: JavaScript syntax
+        run: node --check kiosk_sip_lab/app/static/lab.js
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Desktop and mobile browser workflows
+        run: |
+          python lab_tests/serve.py > /tmp/sip-ui-lab-browser.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:5931/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node lab_tests/ui.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sip-ui-lab-screenshots
+          path: lab-screenshots/
+      - name: Build separate test add-on
+        run: docker build -t sip-ui-lab kiosk_sip_lab
+      - name: Container starts without telephone services
+        run: |
+          docker run -d --name sip-ui-lab sip-ui-lab
+          trap 'docker logs sip-ui-lab; docker rm -f sip-ui-lab' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec sip-ui-lab test -f /run/kiosk-sip-ingress-port; then break; fi
+            sleep 1
+          done
+          docker exec sip-ui-lab test -f /run/kiosk-sip-ingress-port
+          docker exec sip-ui-lab sh -c '! pidof asterisk'
