@@ -1,55 +1,55 @@
-# Implementierung des nativen SIP-Dialers
+# Native SIP dialer implementation
 
-Der native Dialer ist ab Version 26.10.13 Bestandteil des regulären Plugins `kiosk-satellite-sip`. Diese Seite beschreibt Architektur und Testumfang. Die [Hauptanleitung](../README.md) behandelt Installation und Bedienung.
+The native dialer is part of the regular `kiosk-satellite-sip` plugin starting with version 26.10.13. This page describes architecture and test coverage. Installation and usage are covered in the [main guide](../README.md).
 
-## Aufbau
+## Architecture
 
 ```text
-Android-Kiosk mit SIP-Plugin
-  → lokale SIP-Nebenstelle am Asterisk
-  → eingerichtetes Anbieter-Konto
-  → externe Telefonnummer
+Android kiosk with SIP plugin
+  → local SIP extension on Asterisk
+  → configured provider account
+  → external phone number
 ```
 
-Ein langlebiges Android-Overlay zeigt den Telefonknopf und den ausklappbaren Dialer. Darstellung und Farben stammen aus dem Kiosk-Satellite-SDK. Ausgehende Anrufe verwenden direkt SIP INVITE; die Mikrofonaufnahme startet nach Annahme durch die Gegenstelle. Eingehende Anrufe erfordern eine lokale Annahme.
+A persistent Android overlay displays the phone button and expandable dialer. Styling and colors come from the Kiosk Satellite SDK. Outgoing calls use SIP INVITE directly; microphone capture starts after the remote party answers. Incoming calls require local acceptance.
 
-Der Zustand eines Gesprächs ist unabhängig davon, ob das Overlay ausgeklappt ist. SIP-Abbruch, Gegenstellen-Auflegen, Plugin-Stopp und Medienfehler schließen die zugehörigen Ressourcen.
+Call state is independent of whether the overlay is expanded. Cancellation, remote hangup, plugin shutdown, and media failures release the associated resources.
 
-## SIP-Geräte und Rufnummern
+## SIP devices and phone numbers
 
-Asterisk verwaltet für jedes aktivierte SIP-Gerät eine eigene Authentifizierung und Registrierung. Nebenstelle 100 ist für eine Einzelanmeldung vorgesehen; 101–199 stehen für zusätzliche Geräte zur Verfügung. Eine neue Registrierung derselben Nebenstelle ersetzt die bisherige.
+Asterisk maintains separate authentication and registration for each enabled SIP device. Extension 100 supports one device; extensions 101–199 are available for additional devices. A new registration for an extension replaces its previous registration.
 
-Externe Rufnummern können einzelne Geräte oder eine Gruppe als Klingelziel verwenden. Nimmt ein Gerät an, sendet Asterisk CANCEL an die übrigen Ziele. Interne Geräteanrufe sind nicht Teil des SIP-Dialers; dafür steht KS-Intercom zur Verfügung.
+External phone numbers can ring individual devices or a group. When one device answers, Asterisk sends CANCEL to the remaining targets. Internal device calls are handled by KS intercom rather than the SIP dialer.
 
 ## Audio
 
-Das Plugin überträgt G.711-Audio mit RTP zwischen Android und Asterisk. Aufnahme und Wiedergabe verwenden Android-Audio-APIs im Kommunikationsmodus. RTP-Empfang und Lautsprecher laufen in getrennten Threads.
+The plugin sends G.711 audio over RTP between Android and Asterisk. Capture and playback use Android audio APIs in communication mode. RTP reception and speaker playback run on separate threads.
 
-Die PCM-Warteschlange enthält höchstens 480 Samples beziehungsweise 60 ms bei 8 kHz. Bei Rückstau werden alte Frames verworfen. Doppelte oder verspätete RTP-Sequenzen werden nicht erneut wiedergegeben. Für den Android-Wiedergabepuffer werden 320 Frames beziehungsweise 40 ms angefordert; Android kann einen größeren Mindestpuffer vorgeben.
+The PCM queue holds at most 480 samples, or 60 ms at 8 kHz. When a backlog develops, older frames are dropped. Duplicate and late RTP sequences are not replayed. The requested Android playback buffer is 320 frames, or 40 ms; Android may enforce a larger minimum.
 
-Diese Werte beschreiben die lokale Pufferung, nicht die gesamte Gesprächslatenz. Ein gemessener Vergleich auf Android-Geräten liegt nicht vor. Ein adaptiver Jitterpuffer und eine gemeinsame Audio-Lease mit KS/Voice Satellite sind noch nicht umgesetzt.
+These values describe local buffering, not total call latency. A measured comparison on Android devices is not yet available. An adaptive jitter buffer and a shared audio lease with KS/Voice Satellite are not implemented.
 
-## Automatisierte Prüfungen
+## Automated checks
 
-`python tools/test_native.py` kompiliert SDK und Plugin gegen die Android-Schnittstellen. SIP-Tests verwenden einen lokalen simulierten Telefonserver und eine simulierte Medienquelle. Sie prüfen:
+`python tools/test_native.py` compiles the SDK and plugin against the Android APIs. SIP tests use a local simulated telephone server and simulated media. They cover:
 
-- Digest-Registrierung und authentifizierte SIP-Anfragen.
-- Ausgehende und eingehende Gespräche, Abbruch, Annahme-Kollisionen und Auflegen.
-- UDP-Wiederholungen und Abweisung von Antworten aus fremden Quellen.
-- Getrennte Geräteidentitäten und Gesprächszustände.
-- G.711-Konvertierung, SDP und Ressourcenfreigabe bei Medienfehlern.
-- Begrenzte Audiowarteschlange bei Wiedergabestau, variable Paketgrößen, Duplikate und Sequenzüberlauf.
+- Digest registration and authenticated SIP requests.
+- Outgoing and incoming calls, cancellation, answer races, and hangup.
+- UDP retransmissions and rejection of responses from foreign sources.
+- Independent device identities and call state.
+- G.711 conversion, SDP, and resource cleanup after media failures.
+- Bounded audio queues during playback stalls, variable packet sizes, duplicates, and sequence wraparound.
 
-Die Add-on-CI prüft zusätzlich Konfiguration und API sowie reale Asterisk-Instanzen mit mehreren lokalen Testgeräten, Klingelgruppen und Audio-Brücke. Dabei werden fiktive Zugangsdaten verwendet. Diese Prüfungen messen weder die Android-Audioqualität noch die Ende-zu-Ende-Latenz eines Anbieteranschlusses.
+Add-on CI also tests configuration and API behavior, plus real Asterisk instances with multiple local test devices, ring groups, and the audio bridge. Tests use fictional credentials. These checks do not measure Android audio quality or end-to-end latency over a provider connection.
 
-`tools/build.py` erstellt das Android-DEX-Paket. `tools/verify_package.py` kontrolliert Plugin-ID, Manifest, ZIP-Inhalt und SHA-256-Prüfsumme. Die Build-Umgebung benötigt JDK 21 und ein Android-SDK; `JAVA_HOME` und `ANDROID_HOME` verweisen auf diese Installationen.
+`tools/build.py` builds the Android DEX package. `tools/verify_package.py` validates the plugin ID, manifest, ZIP contents, and SHA-256 checksum. The build environment requires JDK 21 and an Android SDK; `JAVA_HOME` and `ANDROID_HOME` point to those installations.
 
-## Herkunft und Lizenz
+## Origins and license
 
-Die Entwicklung erfolgte zunächst unter der separaten Plugin-ID `kiosk-satellite-sip-native-lab`. Diese ID wird für frühere Testinstallationen verwendet; die aktuelle reguläre ID lautet `kiosk-satellite-sip`.
+Development initially used the separate plugin ID `kiosk-satellite-sip-native-lab`. Earlier test installations use that ID; the current regular ID is `kiosk-satellite-sip`.
 
-- [Kiosk Satellite Community SDK](https://github.com/jxlarrea/kiosk-satellite-plugins): SDK, Theme und Overlay-Vertrag.
-- [Navbar](https://github.com/dimatx/kiosk-satellite-navbar): Referenz für native Overlay-Bedienelemente.
-- [SIP Phone](https://github.com/meiser79/kiosk-satellite-sip-phone): Grundlage für SIP-Nachrichten, Digest und G.711-Konvertierung.
+- [Kiosk Satellite Community SDK](https://github.com/jxlarrea/kiosk-satellite-plugins): SDK, theme, and overlay contract.
+- [Navbar](https://github.com/dimatx/kiosk-satellite-navbar): reference for native overlay controls.
+- [SIP Phone](https://github.com/meiser79/kiosk-satellite-sip-phone): basis for SIP messages, Digest, and G.711 conversion.
 
-Lizenz- und Herkunftsangaben stehen in [NOTICE](../NOTICE) und [LICENSE](../LICENSE).
+License and attribution details are in [NOTICE](../NOTICE) and [LICENSE](../LICENSE).

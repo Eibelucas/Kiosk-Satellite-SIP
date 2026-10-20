@@ -1,18 +1,18 @@
-# Kiosk Satellite SIP Gateway für HAOS
+# Kiosk Satellite SIP Gateway for HAOS
 
-Das Add-on enthält den Asterisk-Telefonserver und die Weboberfläche zur Einrichtung von SIP-Anbietern, Rufnummern und Geräten. Die Installation wird auf Home Assistant OS mit amd64-Architektur unterstützt.
+This add-on includes the Asterisk telephone server and a web interface for configuring SIP providers, phone numbers, and devices. Installation is supported on Home Assistant OS with amd64 architecture.
 
-- Anbieterprofile und manuelle SIP-Konfiguration.
-- Bis zu acht externe SIP-Konten mit getrennten Rufnummern und Anrufregeln.
-- Eigene SIP-Nebenstellen und Passwörter für mehrere Kiosks.
-- Klingelziele je externer Rufnummer.
-- Lokaler Echo-Test auf Nebenstelle 600 für angemeldete SIP-Geräte.
-- Optionale Web-Telefonseite mit Kontakten und Kiosk-Karten.
-- Alternative Audio-Brücke zu Kiosk Satellite Intercom.
-- Separate Durchsage-Rufnummern mit Absenderliste, optionaler PIN und Dauerlimit.
+- Provider profiles and manual SIP configuration.
+- Up to eight external SIP accounts with separate numbers and call rules.
+- Individual SIP extensions and passwords for multiple kiosks.
+- Ringing targets for each external phone number.
+- Local echo test on extension 600 for registered SIP devices.
+- Optional web phone page with contacts and kiosk cards.
+- Alternative audio bridge to Kiosk Satellite intercom.
+- Dedicated announcement numbers with caller allowlists, an optional PIN, and a duration limit.
 
-Für den nativen KS-Dialer wird als Audio-Ziel **SIP-Telefon / Softphone 100** gewählt. Die Geräteverwaltung stellt die jeweilige Nebenstelle und deren Passwort bereit. Die Anbieteranmeldung bleibt zentral im Add-on.
+For the native KS dialer, select **SIP phone / Softphone 100** (**SIP-Telefon / Softphone 100**) as the audio target. Device management defines each device extension and password. Provider registration stays centralized in the add-on.
 
-Die alternative **Kiosk Satellite Intercom**-Brücke verbindet ein konfiguriertes Kiosk-Gerät über den gemeinsamen Intercom-Schlüssel. Sie nutzt lokale HTTP-/WebSocket-Verbindungen und unterstützt derzeit kein TLS-Intercom.
+The alternative **Kiosk Satellite Intercom** bridge connects one configured kiosk through a shared intercom key. It uses local HTTP/WebSocket connections and currently does not support TLS intercom.
 
-[Einrichtung, Betriebsarten und Fehlerbehebung](DOCS.md)
+[Setup, operating modes, and troubleshooting](DOCS.md)
