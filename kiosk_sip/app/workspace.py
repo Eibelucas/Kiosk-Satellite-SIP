@@ -6,7 +6,7 @@ import re
 import threading
 from datetime import datetime, timezone
 
-from configuration import atomic_json, secret_value, DEFAULTS, ACCOUNT_DEFAULTS, effective_lines, ACCOUNT_FIELDS, ANNOUNCEMENT_DEFAULTS
+from configuration import atomic_json, secret_value, DEFAULTS, ACCOUNT_DEFAULTS, effective_lines, ACCOUNT_FIELDS, ANNOUNCEMENT_DEFAULTS, incoming_devices
 from providers import PROVIDERS
 
 CONNECTION_KEYS = {"id","name","provider","enabled","auth_mode","auth_username","auth_password",*ACCOUNT_DEFAULTS}
@@ -85,7 +85,7 @@ def validate_draft(body,previous):
         draft["connections"].append(item)
     old_devices={item["id"]:item for item in previous.get("devices",[])}
     extensions=set()
-    for raw in objects(body.get("devices",[]),DEVICE_KEYS,99,"Kiosks"):
+    for raw in objects(body.get("devices",[]),DEVICE_KEYS,100,"Kiosks"):
         item={key:text(raw.get(key,""),key,80) for key in ("id","name","extension","address","room")}
         if not item["name"]: raise ValueError("Kiosk benennen.")
         if not re.fullmatch(r"1[0-9]{2}",item["extension"]) or (item["extension"]=="100" and old_devices.get(item["id"],{}).get("extension")!="100") or item["extension"] in extensions: raise ValueError("Kiosks benötigen eindeutige Nebenstellen von 101 bis 199.")
@@ -196,6 +196,8 @@ class WorkspaceStore:
             line={k:v for k,v in c.items() if k not in {"id","name"}}
             line.update(id=n["id"],label=n["name"],phone_number=n["number"])
             line.update({k:v for k,v in n.items() if k not in {"id","name","number","connection_id"}})
+            if not line["incoming_devices"]:
+                line["incoming_devices"]=[device["extension"] for device in d["devices"] if device["enabled"]]
             lines.append(line)
         if not lines: raise ValueError("Mindestens einen SIP-Zugang aktivieren und einer Rufnummer zuordnen.")
         if d["network"]["sip_port"] in {5038}: raise ValueError("SIP und AMI müssen getrennte Ports verwenden.")
@@ -222,7 +224,7 @@ def migrate_legacy(cfg):
         draft["connections"].append(connection)
         number={key:copy.deepcopy(line.get(key,default)) for key,default in ANNOUNCEMENT_DEFAULTS.items()}
         number.update(id=line.get("id","main"),name=line.get("label") or "Phone number "+str(index+1),number=line["phone_number"],connection_id=connection_id,
-                      incoming_mode=line.get("incoming_mode","normal"),incoming_devices=copy.deepcopy(line.get("incoming_devices",[])))
+                      incoming_mode=line.get("incoming_mode","normal"),incoming_devices=copy.deepcopy(line.get("incoming_devices") or incoming_devices(cfg,line))))
         draft["numbers"].append(number)
     for index,device in enumerate(cfg.get("devices",[])):
         draft["devices"].append({**copy.deepcopy(device),"id":"device_"+device["extension"],"address":"","room":""})

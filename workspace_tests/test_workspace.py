@@ -235,3 +235,15 @@ def test_failed_apply_restores_prior_runtime_configuration(app):
     assert settings.value==previous
     assert settings.workspace_enabled is False
     assert store.applied["revision"]==-1
+
+
+def test_migration_preserves_legacy_all_targets_and_supports_full_device_capacity(tmp_path):
+    from workspace import migrate_legacy
+    source=WorkspaceStore(tmp_path/"source");source.save(configured(),0)
+    settings=Settings(tmp_path/"gateway")
+    body=source.compile();body["phone_password"]="fake-legacy-phone-123";body["lines"][0]["incoming_devices"]=[]
+    settings.save(body)
+    migrated=migrate_legacy(settings.value)
+    assert migrated["numbers"][0]["incoming_devices"]==["101"]
+    migrated["devices"]= [{"id":"legacy_phone","name":"Legacy","extension":"100","password":"fake-legacy-phone-123","enabled":True,"address":"","room":""}]+[{"id":"device_"+str(ext),"name":"Kiosk "+str(ext),"extension":str(ext),"password":"fake-device-secret-123","enabled":True,"address":"","room":""} for ext in range(101,200)]
+    assert len(validate_draft(migrated,migrated)["devices"])==100
