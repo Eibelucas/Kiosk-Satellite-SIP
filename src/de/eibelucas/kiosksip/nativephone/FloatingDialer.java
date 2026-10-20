@@ -18,7 +18,7 @@ final class FloatingDialer implements OverlayFactory {
     private final Actions actions;
     private LinearLayout root, panel, input, keypad;
     private ScrollView scroll;
-    private Button chip,call,end,accept,mute,backspace;
+    private Button chip,call,end,accept,mute,backspace,collapse;
     private TextView status,peer;
     private EditText number;
     private final List<Button> digits=new ArrayList<>();
@@ -34,7 +34,7 @@ final class FloatingDialer implements OverlayFactory {
         LinearLayout header=new LinearLayout(context);header.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=new TextView(context);title.setText("Telefon");theme.styleText(title,18,500,"onSurface");
         header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-        Button collapse=button(context,"Schließen","mdi:chevron-down");collapse.setText("");collapse.setOnClickListener(v->actions.toggle());header.addView(collapse,new LinearLayout.LayoutParams(theme.px(48),theme.px(48)));panel.addView(header);
+        collapse=button(context,"Schließen","mdi:chevron-down");collapse.setText("");collapse.setOnClickListener(v->actions.toggle());header.addView(collapse,new LinearLayout.LayoutParams(theme.px(48),theme.px(48)));panel.addView(header);
         status=new TextView(context);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);status.setPadding(0,theme.px(6),0,theme.px(10));panel.addView(status);
         peer=new TextView(context);panel.addView(peer);
         input=new LinearLayout(context);input.setGravity(Gravity.CENTER_VERTICAL);
@@ -65,6 +65,14 @@ final class FloatingDialer implements OverlayFactory {
     }
     private LinearLayout.LayoutParams full(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,theme.px(48));p.topMargin=theme.px(8);return p;}
     private Button button(Context c,String label,String icon){Button b=new Button(c);b.setAllCaps(false);b.setText(label);b.setContentDescription(label);b.setMinWidth(0);b.setMinimumWidth(0);b.setPadding(theme.px(8),0,theme.px(8),0);if(icon!=null){Drawable d=theme.icon(icon,"onSurface");if(d!=null){b.setCompoundDrawablesWithIntrinsicBounds(d,null,null,null);}}theme.stylePill(b,false);return b;}
+    private void iconOnly(Button button,String icon,boolean filled){
+        // Foreground gravity centers the icon in the actual touch target, independent of text layout.
+        button.setText("");button.setCompoundDrawables(null,null,null,null);
+        button.setPadding(0,0,0,0);button.setMinWidth(0);button.setMinimumWidth(0);button.setMinHeight(0);button.setMinimumHeight(0);
+        Drawable image=theme.icon(icon,filled?"onPrimary":"primary");
+        if(image==null)image=theme.icon("mdi:phone",filled?"onPrimary":"primary");
+        button.setForeground(image);button.setForegroundGravity(Gravity.CENTER);
+    }
     void refresh(){
         if(root==null)return;
         scroll.setVisibility(model.expanded?View.VISIBLE:View.GONE);
@@ -78,11 +86,12 @@ final class FloatingDialer implements OverlayFactory {
         accept.setVisibility(model.state.equals("incoming")?View.VISIBLE:View.GONE);
         mute.setVisibility(model.state.equals("connected")?View.VISIBLE:View.GONE);mute.setText(model.muted?"Mikrofon einschalten":"Stumm");mute.setSelected(model.muted);
         end.setVisibility(model.active()?View.VISIBLE:View.GONE);end.setText(model.state.equals("incoming")?"Ablehnen":model.state.equals("connected")?"Auflegen":"Abbrechen");
-        chip.setContentDescription(model.active()?"Gespräch anzeigen":"Telefon öffnen");chip.setText(model.active()?"●":"");
+        chip.setContentDescription(model.active()?"Gespräch anzeigen":"Telefon öffnen");
+        if(chip.isSelected()!=model.active()){chip.setSelected(model.active());iconOnly(chip,model.active()?"mdi:phone-in-talk":"mdi:phone",true);}
         chip.setAlpha(model.registered||model.active()?1f:.6f);
         root.requestLayout();
     }
-    private void style(KsTheme next){theme=next;if(panel==null)return;panel.setBackground(theme.card());theme.styleText(status,13,400,"onSurfaceVariant");theme.styleText(peer,22,500,"onSurface");theme.styleText(number,24,400,"onSurface");for(Button b:digits)theme.stylePill(b,false);for(Button b:new Button[]{call,accept,chip})theme.stylePill(b,true);theme.stylePill(mute,false);theme.stylePill(end,false);end.setTextColor(theme.color("error"));}
+    private void style(KsTheme next){theme=next;if(panel==null)return;panel.setBackground(theme.card());theme.styleText(status,13,400,"onSurfaceVariant");theme.styleText(peer,22,500,"onSurface");theme.styleText(number,24,400,"onSurface");for(Button b:digits)theme.stylePill(b,false);for(Button b:new Button[]{call,accept,chip})theme.stylePill(b,true);theme.stylePill(mute,false);theme.stylePill(end,false);end.setTextColor(theme.color("error"));theme.stylePill(collapse,false);theme.stylePill(backspace,false);iconOnly(chip,model.active()?"mdi:phone-in-talk":"mdi:phone",true);iconOnly(collapse,"mdi:chevron-down",false);iconOnly(backspace,"mdi:backspace-outline",false);}
     public void onThemeChanged(View view,KsTheme theme){if(view==root){style(theme);refresh();}}
     public void onDestroy(View view){if(view==root){root=null;panel=null;digits.clear();}}
     Context audioContext(){return audioContext;}

@@ -1,6 +1,10 @@
 # Native Dialer Lab
 
-Dieser Entwicklungszweig erprobt ein natives Telefon in Kiosk Satellite. Er ist **kein fertiges Release**. Das HAOS-Add-on ergänzt die Geräteverwaltung; der experimentelle Plugin-Build verwendet die separate ID `kiosk-satellite-sip-native-lab` und Version `26.10.13-lab.4`.
+Dieser Entwicklungszweig erprobt ein natives Telefon in Kiosk Satellite. Er ist **kein fertiges Release**. Das HAOS-Add-on ergänzt die Geräteverwaltung; der experimentelle Plugin-Build verwendet die separate ID `kiosk-satellite-sip-native-lab` und Version `26.10.13-lab.5`.
+
+## Lab.5: Zentrierte Icons
+
+Telefonknopf, Schließen und Löschen zeichnen ihre Icons mittig im gesamten Touch-Ziel. Textabstände und Mindestbreiten des allgemeinen Pillen-Designs verschieben sie nicht mehr. Die Icon-Farben folgen dem aktuellen KS-Design; ein aktives Gespräch verwendet ein Telefon-Gesprächsicon statt eines zusätzlichen Textpunkts. Die Änderungen aus Lab.4 sind enthalten.
 
 ## Lab.4: Gesprächsansicht und Audiopuffer
 
