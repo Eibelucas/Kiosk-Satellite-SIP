@@ -1,9 +1,9 @@
 import sys
 import tempfile
 from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"kiosk_sip_lab"/"app"))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"kiosk_sip"/"app"))
 from configuration import Settings
-from lab_server import create_app
+from workspace_server import create_app
 from werkzeug.serving import run_simple
 
 class Pbx:
@@ -17,4 +17,4 @@ app=create_app(Settings(directory.name),Pbx())
 def ingress(environ,start):
     environ["kiosk.ingress"]=True
     return app(environ,start)
-run_simple("127.0.0.1",5931,ingress,use_reloader=False)
+run_simple("127.0.0.1",5932,ingress,use_reloader=False)

@@ -1,4 +1,4 @@
-"""Isolated, normalized UI draft store and explicit application to the test PBX."""
+"""Normalized administration drafts with migration of existing gateway settings."""
 import copy
 import ipaddress
 import json
@@ -6,7 +6,7 @@ import re
 import threading
 from datetime import datetime, timezone
 
-from configuration import atomic_json, secret_value, DEFAULTS, ACCOUNT_DEFAULTS
+from configuration import atomic_json, secret_value, DEFAULTS, ACCOUNT_DEFAULTS, effective_lines, ACCOUNT_FIELDS, ANNOUNCEMENT_DEFAULTS
 from providers import PROVIDERS
 
 CONNECTION_KEYS = {"id","name","provider","enabled","auth_mode","auth_username","auth_password",*ACCOUNT_DEFAULTS}
@@ -20,8 +20,8 @@ ROOT_KEYS = {"schema_version","demo","runtime_enabled","connections","numbers","
 
 def blank():
     return {"schema_version":1,"demo":False,"runtime_enabled":False,"connections":[],"numbers":[],"devices":[],"contacts":[],
-            "network":{"listen_address":"","local_network":"","external_address":"","sip_port":5083},
-            "audio":{"phone_password":"","audio_target":"sip","kiosk_address":"","kiosk_port":2324,"intercom_port":8093,"intercom_key":""},
+            "network":{"listen_address":"","local_network":"","external_address":"","sip_port":5070},
+            "audio":{"phone_password":"","audio_target":"sip","kiosk_address":"","kiosk_port":2324,"intercom_port":8090,"intercom_key":""},
             "web":{"lan_enabled":False,"web_username":"kiosk","web_password":""},"outbound_number":""}
 
 def sample():
@@ -88,7 +88,7 @@ def validate_draft(body,previous):
     for raw in objects(body.get("devices",[]),DEVICE_KEYS,99,"Kiosks"):
         item={key:text(raw.get(key,""),key,80) for key in ("id","name","extension","address","room")}
         if not item["name"]: raise ValueError("Kiosk benennen.")
-        if not re.fullmatch(r"1[0-9]{2}",item["extension"]) or item["extension"]=="100" or item["extension"] in extensions: raise ValueError("Kiosks benötigen eindeutige Nebenstellen von 101 bis 199.")
+        if not re.fullmatch(r"1[0-9]{2}",item["extension"]) or (item["extension"]=="100" and old_devices.get(item["id"],{}).get("extension")!="100") or item["extension"] in extensions: raise ValueError("Kiosks benötigen eindeutige Nebenstellen von 101 bis 199.")
         extensions.add(item["extension"])
         if item["address"]:
             try:
@@ -96,9 +96,12 @@ def validate_draft(body,previous):
                 if ip.is_multicast or ip.is_unspecified: raise ValueError()
             except ValueError: raise ValueError("Kiosk-Adresse muss eine IPv4-Adresse sein.") from None
         item["enabled"]=boolean(raw.get("enabled",True),"Kiosk aktiv")
+        if item["extension"]=="100" and not item["enabled"]: raise ValueError("Die kompatible Nebenstelle 100 bleibt aktiv. Den Telefonserver bei Bedarf unter Netzwerk ausschalten.")
         old=old_devices.get(item["id"],{})
         item["password"]=retained(raw,old,"password","Geräte-SIP-Passwort",item["extension"]==old.get("extension"))
         draft["devices"].append(item)
+    if any(item["extension"]=="100" for item in previous.get("devices",[])) and not any(item["extension"]=="100" for item in draft["devices"]):
+        raise ValueError("Die übernommene Nebenstelle 100 bleibt für bestehende Anmeldungen erhalten.")
     old_numbers={item["id"]:item for item in previous.get("numbers",[])}
     for raw in objects(body.get("numbers",[]),NUMBER_KEYS,8,"Rufnummern"):
         item={"incoming_mode":"normal","incoming_devices":[],"announcement_callers":[],"announcement_pin":"","announcement_auto_answer":False,"announcement_max_seconds":180,**raw}
@@ -143,16 +146,24 @@ def validate_draft(body,previous):
     if draft["outbound_number"] and draft["outbound_number"] not in {n["id"] for n in draft["numbers"]}: raise ValueError("Standardrufnummer prüfen.")
     return draft
 
-class LabStore:
-    def __init__(self,directory):
-        self.path=directory/"ui-lab.json"
-        self.applied_path=directory/"ui-lab-applied.json"
+class WorkspaceStore:
+    def __init__(self,directory,legacy=None):
+        self.web_password_existing=bool((legacy or {}).get("web_password_hash"))
+        self.path=directory/"workspace.json"
+        self.applied_path=directory/"workspace-applied.json"
         self.lock=threading.RLock()
         saved=json.loads(self.path.read_text()) if self.path.exists() else {}
         self.value=saved.get("draft",blank())
         self.revision=saved.get("revision",0)
         self.updated=saved.get("updated","")
         self.applied=json.loads(self.applied_path.read_text()) if self.applied_path.exists() else {"revision":-1,"runtime_enabled":False,"updated":""}
+        if not saved and legacy is not None:
+            self.value=migrate_legacy(legacy)
+            self.revision=0
+            self.updated=datetime.now(timezone.utc).isoformat()
+            self.applied={"revision":0,"runtime_enabled":self.value["runtime_enabled"],"updated":self.updated}
+            atomic_json(self.path,{"draft":self.value,"revision":0,"updated":self.updated})
+            atomic_json(self.applied_path,self.applied)
     def public(self):
         value=copy.deepcopy(self.value)
         for section,key in (("connections","auth_password"),("devices","password"),("numbers","announcement_pin")):
@@ -160,6 +171,7 @@ class LabStore:
                 item[key+"_set"]=bool(item.pop(key,""))
         for section,key in (("audio","phone_password"),("audio","intercom_key"),("web","web_password")):
             value[section][key+"_set"]=bool(value[section].pop(key,""))
+        value["web"]["web_password_set"]=value["web"]["web_password_set"] or self.web_password_existing
         return {"draft":value,"revision":self.revision,"updated":self.updated,"applied":self.applied}
     def save(self,body,expected):
         if type(expected) is not int or expected!=self.revision: raise RuntimeError("Der Entwurf wurde in einem anderen Fenster geändert. Seite neu laden.")
@@ -186,8 +198,36 @@ class LabStore:
             line.update({k:v for k,v in n.items() if k not in {"id","name","number","connection_id"}})
             lines.append(line)
         if not lines: raise ValueError("Mindestens einen SIP-Zugang aktivieren und einer Rufnummer zuordnen.")
-        if d["network"]["sip_port"] in {5053,5070,5038,5039,8088,8092,8093}: raise ValueError("Für das Testsystem einen eigenen SIP-Port verwenden, zum Beispiel 5083.")
-        if d["audio"]["audio_target"]=="kiosk" and d["audio"]["intercom_port"] in {5038,5039,5053,5070,8088,8090,8092}: raise ValueError("Für die Test-Brücke einen eigenen Rückrufport verwenden, zum Beispiel 8093.")
-        return {**d["network"],**d["audio"],**d["web"],"lines":lines,"outbound_line":d["outbound_number"],
-                "devices":[{k:v for k,v in device.items() if k in {"name","extension","password","enabled"}} for device in d["devices"]],
+        if d["network"]["sip_port"] in {5038}: raise ValueError("SIP und AMI müssen getrennte Ports verwenden.")
+        if d["audio"]["audio_target"]=="kiosk" and d["audio"]["intercom_port"] in {5038,d["network"]["sip_port"]}: raise ValueError("Rückruf-, SIP- und AMI-Ports müssen getrennt sein.")
+        legacy=next((device for device in d["devices"] if device["extension"]=="100"),None)
+        audio={**d["audio"]}
+        if legacy: audio["phone_password"]=legacy["password"]
+        return {**d["network"],**audio,**d["web"],"lines":lines,"outbound_line":d["outbound_number"],
+                "devices":[{k:v for k,v in device.items() if k in {"name","extension","password","enabled"}} for device in d["devices"] if device["extension"]!="100"],
                 "contacts":[{k:v for k,v in contact.items() if k!="id"} for contact in d["contacts"]]}
+
+
+def migrate_legacy(cfg):
+    """Keep SIP identities, secrets, routing and network values during an in-place upgrade."""
+    draft=blank()
+    draft["runtime_enabled"]=bool(cfg.get("enabled"))
+    for section,keys in (("network",NETWORK_KEYS),("audio",AUDIO_KEYS),("web",WEB_KEYS-{"web_password"})):
+        for key in keys:
+            if key in cfg: draft[section][key]=copy.deepcopy(cfg[key])
+    for index,line in enumerate(effective_lines(cfg)):
+        connection_id="account_"+str(index+1)
+        connection={key:copy.deepcopy(line.get(key,DEFAULTS.get(key,""))) for key in ACCOUNT_FIELDS if key!="phone_number"}
+        connection.update(id=connection_id,name=line.get("label") or "SIP account "+str(index+1))
+        draft["connections"].append(connection)
+        number={key:copy.deepcopy(line.get(key,default)) for key,default in ANNOUNCEMENT_DEFAULTS.items()}
+        number.update(id=line.get("id","main"),name=line.get("label") or "Phone number "+str(index+1),number=line["phone_number"],connection_id=connection_id,
+                      incoming_mode=line.get("incoming_mode","normal"),incoming_devices=copy.deepcopy(line.get("incoming_devices",[])))
+        draft["numbers"].append(number)
+    for index,device in enumerate(cfg.get("devices",[])):
+        draft["devices"].append({**copy.deepcopy(device),"id":"device_"+device["extension"],"address":"","room":""})
+    if cfg.get("phone_password"):
+        draft["devices"].insert(0,{"id":"legacy_phone","name":"Telefon 100","extension":"100","password":cfg["phone_password"],"enabled":True,"address":"","room":""})
+    draft["contacts"]=[{**copy.deepcopy(contact),"id":"contact_"+str(index+1)} for index,contact in enumerate(cfg.get("contacts",[]))]
+    draft["outbound_number"]=cfg.get("outbound_line",draft["numbers"][0]["id"] if draft["numbers"] else "")
+    return draft

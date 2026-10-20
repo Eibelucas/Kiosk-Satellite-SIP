@@ -6,9 +6,10 @@ from pathlib import Path
 from waitress import create_server
 
 from configuration import Settings
-from pbx import Pbx
+from workspace_pbx import WorkspacePbx as Pbx
 from networking import ingress_port
-from server import IngressOnly, LanOnly, create_app
+from server import IngressOnly, LanOnly
+from workspace_server import create_app
 
 
 def start_services(settings, pbx, port, ha_port):
@@ -60,7 +61,7 @@ def main():
     try:
         servers = start_services(settings, pbx, port, ha_port)
         Path("/run/kiosk-sip-ingress-port").write_text(str(ha_port))
-        print("HA-Einrichtung bereit: Weboberfläche öffnen. SIP-Status im Assistenten prüfen.", flush=True)
+        print("HA-Einrichtung bereit: Weboberfläche öffnen. SIP-Status in der Übersicht prüfen.", flush=True)
         while not stopping.wait(1):
             if pbx.process is not None and pbx.process.poll() is not None:
                 raise RuntimeError("Asterisk wurde beendet; das Add-on muss neu starten.")

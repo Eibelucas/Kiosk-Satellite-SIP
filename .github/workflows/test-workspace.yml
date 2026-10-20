@@ -1,0 +1,52 @@
+name: Test SIP Gateway Workspace
+on:
+  push:
+    branches: [main]
+    paths: ['kiosk_sip/**', 'workspace_tests/**', '.github/workflows/test-workspace.yml']
+  pull_request:
+    paths: ['kiosk_sip/**', 'workspace_tests/**', '.github/workflows/test-workspace.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r kiosk_sip/requirements.txt pytest PyYAML
+      - name: Draft, API, secrets and isolation tests
+        run: python -m pytest workspace_tests/test_workspace.py -q
+      - name: JavaScript syntax
+        run: node --check kiosk_sip/app/static/workspace.js
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Desktop and mobile browser workflows
+        run: |
+          python workspace_tests/serve.py > /tmp/sip-workspace-browser.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:5932/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node workspace_tests/ui.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sip-workspace-screenshots
+          path: workspace-screenshots/
+      - name: Build gateway with redesigned workspace
+        run: docker build -t sip-workspace kiosk_sip
+      - name: Container starts without telephone services
+        run: |
+          docker run -d --name sip-workspace sip-workspace
+          trap 'docker logs sip-workspace; docker rm -f sip-workspace' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec sip-workspace test -f /run/kiosk-sip-ingress-port; then break; fi
+            sleep 1
+          done
+          docker exec sip-workspace test -f /run/kiosk-sip-ingress-port
+          docker exec sip-workspace sh -c '! pidof asterisk'
