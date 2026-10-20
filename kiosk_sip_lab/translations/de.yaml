@@ -1,0 +1,4 @@
+configuration:
+  gateway_port:
+    name: Port für die Kiosk-Telefonseite
+    description: Standard 8088. Der LAN-Zugriff wird erst im Assistenten aktiviert. Nach Änderung das Add-on neu starten.
