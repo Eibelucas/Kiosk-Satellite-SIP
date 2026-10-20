@@ -21,14 +21,15 @@
       "type": "string",
       "default": "",
       "group": "Geräte-Anmeldung",
-      "description": "Lokale IPv4-Adresse des bestehenden HAOS-Add-ons. Keine SIP-Anbieter-Zugangsdaten."
+      "description": "Lokale IPv4-Adresse des Home-Assistant-OS-Systems mit dem Asterisk-Telefonserver."
     },
     {
       "key": "port",
       "title": "Asterisk SIP-Port",
       "type": "string",
       "default": "5070",
-      "group": "Geräte-Anmeldung"
+      "group": "Geräte-Anmeldung",
+      "description": "SIP-Port des Asterisk-Telefonservers gemäß Einrichtungsassistent."
     },
     {
       "key": "extension",
@@ -36,7 +37,7 @@
       "type": "string",
       "default": "100",
       "group": "Geräte-Anmeldung",
-      "description": "Pro Gerät eine andere Nummer: 101 bis 199. 100 ist die bisherige gemeinsame Nebenstelle."
+      "description": "Nummer des eingerichteten SIP-Geräts: 100 für eine Einzelanmeldung oder 101 bis 199 für zusätzliche Geräte."
     },
     {
       "key": "password",
@@ -44,7 +45,7 @@
       "type": "secret",
       "default": "",
       "group": "Geräte-Anmeldung",
-      "description": "Eigenes Geräte-Passwort aus der HA-Einrichtung; bei Nebenstelle 100 das bisherige Telefon-Passwort."
+      "description": "Passwort der Geräte-Nebenstelle aus der Geräteverwaltung im HA-Einrichtungsassistenten."
     },
     {
       "key": "localPort",
@@ -70,7 +71,7 @@
       "type": "string",
       "default": "88",
       "group": "Telefonknopf",
-      "description": "Platz für die Navbar lassen. 12 bis 300."
+      "description": "Abstand des Telefonknopfs zur Bildschirmunterkante in dp; Bereich 12 bis 300."
     }
   ],
   "commands": [

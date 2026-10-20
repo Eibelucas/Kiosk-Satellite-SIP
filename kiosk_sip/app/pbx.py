@@ -169,4 +169,4 @@ class Pbx:
                     raise RuntimeError("Asterisk hat den Rückruf abgelehnt.")
                 return {"message": "Kiosk wird angerufen. Am Kiosk annehmen; danach startet der lokale Echo-Test." if native and local_test else
                         "Kiosk wird angerufen. Am Kiosk annehmen; erst danach wird die Zielnummer gewählt." if native else
-                        "Rückruf angefordert. Nimm dein SIP-Telefon 100 an; danach wird die Zielnummer gewählt."}
+                        "Rückruf angefordert. Nach Annahme am SIP-Telefon 100 wird die Zielnummer gewählt."}

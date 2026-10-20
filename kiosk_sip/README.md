@@ -1,15 +1,18 @@
 # Kiosk Satellite SIP Gateway für HAOS
 
-Asterisk und Telefon-Gateway in einem Add-on, mit deutschem Anbieter-Onboarding.
+Das Add-on enthält den Asterisk-Telefonserver und die Weboberfläche zur Einrichtung von SIP-Anbietern, Rufnummern und Geräten. Die Installation wird auf Home Assistant OS mit amd64-Architektur unterstützt.
 
-- amd64, passend für HAOS auf einem unterstützten amd64-System
-- Einrichtung über Home Assistant Ingress
-- Telekom, sipgate, easybell, FRITZ!Box und eigene SIP-Zugangsdaten
-- Mehrere Rufnummern, normale Hauptrufnummer und separate Durchsagen mit Absenderliste/PIN
-- SIP-Nebenstelle 100 und lokaler Echo-Test 600
-- Anrufpad, Telefonkontakte und Kiosk-/Raumkarten mit Suche/Favoriten
-- Optionaler LAN-Zugang mit eigenem Kiosk-Passwort
+- Anbieterprofile und manuelle SIP-Konfiguration.
+- Bis zu acht externe SIP-Konten mit getrennten Rufnummern und Anrufregeln.
+- Eigene SIP-Nebenstellen und Passwörter für mehrere Kiosks.
+- Klingelziele je externer Rufnummer.
+- Lokaler Echo-Test auf Nebenstelle 600 für angemeldete SIP-Geräte.
+- Optionale Web-Telefonseite mit Kontakten und Kiosk-Karten.
+- Alternative Audio-Brücke zu Kiosk Satellite Intercom.
+- Separate Durchsage-Rufnummern mit Absenderliste, optionaler PIN und Dauerlimit.
 
-**Audio-Ziel wählen:** Ab 26.10.9 ist Kiosk Satellite Intercom mit nativer Anrufanzeige, Mikrofon und Lautsprecher verfügbar. Alternativ SIP-Telefon 100 verwenden. Ein konfigurierter Kiosk, gemeinsamer Intercom-Schlüssel und lokale HTTP/WS-Verbindung; TLS-Intercom ist noch nicht unterstützt. Kiosk-Karten sind die Kontaktanzeige im Anrufpad.
+Für den nativen KS-Dialer wird als Audio-Ziel **SIP-Telefon / Softphone 100** gewählt. Die Geräteverwaltung stellt die jeweilige Nebenstelle und deren Passwort bereit. Die Anbieteranmeldung bleibt zentral im Add-on.
 
-Alle Schritte und Gegenproben stehen im Tab **Dokumentation** bzw. in [DOCS.md](DOCS.md).
+Die alternative **Kiosk Satellite Intercom**-Brücke verbindet ein konfiguriertes Kiosk-Gerät über den gemeinsamen Intercom-Schlüssel. Sie nutzt lokale HTTP-/WebSocket-Verbindungen und unterstützt derzeit kein TLS-Intercom.
+
+[Einrichtung, Betriebsarten und Fehlerbehebung](DOCS.md)

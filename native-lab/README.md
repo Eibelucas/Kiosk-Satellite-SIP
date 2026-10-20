@@ -1,91 +1,55 @@
-# Nativer SIP-Dialer
+# Implementierung des nativen SIP-Dialers
 
-Die Entwicklung aus dem Zweig `native-dialer-lab` wird ab **26.10.13** regulär als **Kiosk Satellite SIP** veröffentlicht. Für aktuelle Installation und Migration die [Hauptanleitung](../README.md) verwenden. Das bisherige Lab-Plugin hat eine eigene ID und muss beim Wechsel deaktiviert werden.
-
-Die folgende Dokumentation beschreibt die Entwicklungsschritte und technischen Grenzen der Lab-Versionen bis Lab.5; deren ZIPs und der Entwicklungsverlauf bleiben erhalten.
-
-Dieser Entwicklungszweig erprobt ein natives Telefon in Kiosk Satellite. Er ist **kein fertiges Release**. Das HAOS-Add-on ergänzt die Geräteverwaltung; der experimentelle Plugin-Build verwendet die separate ID `kiosk-satellite-sip-native-lab` und Version `26.10.13-lab.5`.
-
-## Lab.5: Zentrierte Icons
-
-Telefonknopf, Schließen und Löschen zeichnen ihre Icons mittig im gesamten Touch-Ziel. Textabstände und Mindestbreiten des allgemeinen Pillen-Designs verschieben sie nicht mehr. Die Icon-Farben folgen dem aktuellen KS-Design; ein aktives Gespräch verwendet ein Telefon-Gesprächsicon statt eines zusätzlichen Textpunkts. Die Änderungen aus Lab.4 sind enthalten.
-
-## Lab.4: Gesprächsansicht und Audiopuffer
-
-- Beim Anrufen und während des Gesprächs verschwinden Nummerneingabe und Wähltasten vollständig. Die Zielnummer erscheint einmal in der Gesprächsansicht; nach dem Auflegen kehrt die Eingabe zurück.
-- RTP-Empfang und Lautsprecher laufen in getrennten Threads. Eine langsame Wiedergabe blockiert den Paketempfang nicht mehr. Maximal 60 ms PCM warten auf Wiedergabe; bei Rückstau werden alte Pakete verworfen. Doppelte und verspätete RTP-Sequenzen werden nicht wiedergegeben.
-- Android erhält eine 40-ms-Zielgröße für den Wiedergabepuffer und eine Anfrage nach dem schnellen Audiopfad ab Android 8. Geräte dürfen größere Mindestpuffer erzwingen. Aufnahme verwendet den Kommunikationsmodus; Audiothreads erhalten Audiopriorität.
-- Die neue Pufferlogik wird mit simuliertem Wiedergabestau, variablen Paketgrößen, Duplikaten und Sequenzüberlauf getestet. Tatsächliche Ende-zu-Ende-Latenz und mögliche Aussetzer müssen am Gerät verglichen werden. Anbieter, WLAN und Bluetooth können weitere Verzögerung verursachen.
-- Das bestehende Add-on muss dafür nicht aktualisiert werden. Im HA-Assistenten eine Standardrufnummer für ausgehende Anrufe auswählen und im Plugin den tatsächlichen SIP-Port eintragen.
-
-## Bedienung
-
-- Ein schwebender Telefonknopf sitzt rechts unten, mit einstellbarer Seite und Abstand zur Navbar.
-- Antippen klappt ein natives Android-Wählfeld aus demselben Overlay auf. Kein Browser, kein WebView und kein Browser-Bestätigungsdialog.
-- **Anrufen** sendet direkt einen SIP INVITE an Asterisk. Es gibt keinen Rückruf zum eigenen Kiosk und keinen lokalen Annehmen-Schritt für ausgehende Anrufe.
-- Die Ansicht folgt Verbindungsaufbau, Klingeln beim Ziel, Gesprächsdauer, Abbruch und Auflegen. Stumm schickt stille Audiodaten.
-- Gedrückthalten der 0 fügt am Anfang ein Plus ein. Das native Wählfeld öffnet keine zusätzliche Bildschirmtastatur.
-- Einklappen lässt einen laufenden Anruf bestehen. Der Telefonknopf öffnet die Gesprächssteuerung wieder.
-- Eingehende SIP-Anrufe behalten **Annehmen / Ablehnen**. Sie werden nicht automatisch angenommen.
+Der native Dialer ist ab Version 26.10.13 Bestandteil des regulären Plugins `kiosk-satellite-sip`. Diese Seite beschreibt Architektur und Testumfang. Die [Hauptanleitung](../README.md) behandelt Installation und Bedienung.
 
 ## Aufbau
 
-`Telefonknopf → nativer Dialer → eigene SIP-Nebenstelle → bestehender Asterisk → Hauptrufnummer / Anbieter`
+```text
+Android-Kiosk mit SIP-Plugin
+  → lokale SIP-Nebenstelle am Asterisk
+  → eingerichtetes Anbieter-Konto
+  → externe Telefonnummer
+```
 
-Audio läuft direkt zwischen dem Plugin und Asterisk über G.711/RTP. Die bisherigen Anbieter-Zugangsdaten bleiben im HAOS-Add-on. Das Plugin braucht nur dessen lokale IP, SIP-Port und eine **eigene Nebenstelle und deren SIP-Passwort**. Dieses Passwort nutzt den SDK-Einstellungstyp `secret`.
+Ein langlebiges Android-Overlay zeigt den Telefonknopf und den ausklappbaren Dialer. Darstellung und Farben stammen aus dem Kiosk-Satellite-SDK. Ausgehende Anrufe verwenden direkt SIP INVITE; die Mikrofonaufnahme startet nach Annahme durch die Gegenstelle. Eingehende Anrufe erfordern eine lokale Annahme.
 
-Das ist ein zweiter Audioansatz neben der bisherigen nativen KS-Intercom-Brücke. Er verwendet deren Rückrufmechanismus nicht und ändert keine globale automatische Annahme.
+Der Zustand eines Gesprächs ist unabhängig davon, ob das Overlay ausgeklappt ist. SIP-Abbruch, Gegenstellen-Auflegen, Plugin-Stopp und Medienfehler schließen die zugehörigen Ressourcen.
 
-## Am eigenen Gerät ausprobieren
+## SIP-Geräte und Rufnummern
 
-1. Eine aktuelle Kiosk-Satellite-Version mit nativen SDK-Overlays, `secret`-Einstellungen und den dokumentierten Host-Zuständen verwenden (Referenz-SDK vom 19.10.2026; Navbar nennt 2026.10.23 als Mindeststand).
-2. Für mehrere Kiosks das experimentelle HAOS-Add-on aus https://github.com/Eibelucas/Kiosk-Satellite-SIP#native-dialer-lab installieren. Home Assistant unterstützt #branch in Repository-URLs ([offizielle Dokumentation](https://contributors.home-assistant.io/apps/supervisor-api/store/)). Vor dessen Start das bisherige Add-on stoppen: beide würden dieselben SIP-/Web-Ports verwenden. Der Zweig hat einen eigenen Repository-/Add-on-Datenbereich; bisherige Anschlussdaten werden nicht automatisch kopiert.
-3. Im HA-Assistenten SIP-Audio wählen und unter **Mehrere native Kiosks / SIP-Geräte** etwa Küche 101 und Wohnzimmer 102 mit jeweils eigenem Passwort anlegen. In jedem Kiosk dieselbe eigene Nummer und dasselbe eigene Passwort hinterlegen. Jeder Endpunkt behält eine Registrierung, Geräte verdrängen sich nicht. 100 bleibt für die alte Einzelanmeldung reserviert.
-4. Die Lab-ZIP über **Plugin-Manager → Developer Tools → Install from ZIP** installieren. Noch kein Community-/Stable-Release dieses Experiments veröffentlichen.
-5. Im Lab-Plugin HAOS-IP, den tatsächlichen Asterisk-SIP-Port (Vorgabe `5070`) sowie die eigene Nebenstelle und deren Passwort eintragen. Lokaler Plugin-Port ist `5090`.
-6. Für diesen Audioversuch Wake Word und andere Mikrofonaufnahmen pausieren. Das Plugin verändert keine dauerhafte Wake-Word-Einstellung. Bei gemeldeter aktiver Aufnahme oder Intercom-/Sprachsitzung blockiert es den Anruf.
-7. Erst den Telefonknopf und das Ein-/Ausklappen prüfen. Danach **600 im nativen Dialer** wählen: Die Anmeldung als eigenes SIP-Gerät landet im bestehenden `from-phone`-Kontext, der 600 ausdrücklich lokal als Echo behandelt. Dies ist etwas anderes als 600 in der alten Web-Telefonseite.
-8. Mikrofonberechtigung, beidseitiges Echo, Stumm, Auflegen, Gegenstellen-Auflegen, Einklappen während eines Gesprächs und Plugin-Deaktivierung prüfen. Erst danach einen gewünschten externen Anruf versuchen.
+Asterisk verwaltet für jedes aktivierte SIP-Gerät eine eigene Authentifizierung und Registrierung. Nebenstelle 100 ist für eine Einzelanmeldung vorgesehen; 101–199 stehen für zusätzliche Geräte zur Verfügung. Eine neue Registrierung derselben Nebenstelle ersetzt die bisherige.
 
-Zum Zurückkehren das Lab-Plugin deaktivieren und das bisherige Audio-Ziel wieder wählen. Anbieter- und Kontaktkonfiguration werden vom Lab-Plugin nicht geschrieben.
+Externe Rufnummern können einzelne Geräte oder eine Gruppe als Klingelziel verwenden. Nimmt ein Gerät an, sendet Asterisk CANCEL an die übrigen Ziele. Interne Geräteanrufe sind nicht Teil des SIP-Dialers; dafür steht KS-Intercom zur Verfügung.
 
-## Mehrere Kiosks, externe Telefonie
+## Audio
 
-- Bis zu 99 getrennte Geräte-Nebenstellen (101–199), mit eigenem Namen, Passwort und Aktivierung.
-- Pro externer Rufnummer lassen sich unter **Klingelnde SIP-Geräte** bestimmte Kiosks auswählen. Ohne Auswahl klingeln alle aktiven Geräte aus der Geräteliste. Sobald eines annimmt, beendet Asterisk das Klingeln der anderen.
-- Externe Anrufe können von jedem angemeldeten Gerät direkt gestartet werden. Gleichzeitige externe Gespräche hängen zusätzlich von den Leitungsgrenzen des Anbieters ab.
-- Interne Kiosk-Anrufe bleiben beim vorhandenen KS-Intercom. Das Plugin ergänzt weder eine zweite Geräteliste noch eine interne Intercom-Funktion.
-- Die neue Geräteverwaltung benötigt das Add-on aus diesem Entwicklungszweig. Das stabile Add-on 26.10.12 kennt nur Telefon 100.
-- Lab.2 korrigierte den fehlenden Pflicht-Standardwert des geheimen Passwortfelds; Lab.3 enthält diese Korrektur und Mehrgeräte-SIP.
+Das Plugin überträgt G.711-Audio mit RTP zwischen Android und Asterisk. Aufnahme und Wiedergabe verwenden Android-Audio-APIs im Kommunikationsmodus. RTP-Empfang und Lautsprecher laufen in getrennten Threads.
 
-## Was automatisiert geprüft wird
+Die PCM-Warteschlange enthält höchstens 480 Samples beziehungsweise 60 ms bei 8 kHz. Bei Rückstau werden alte Frames verworfen. Doppelte oder verspätete RTP-Sequenzen werden nicht erneut wiedergegeben. Für den Android-Wiedergabepuffer werden 320 Frames beziehungsweise 40 ms angefordert; Android kann einen größeren Mindestpuffer vorgeben.
 
-`python tools/test_native.py` kompiliert SDK und Plugin gegen Android 35 und prüft echte UDP-SIP-Pakete gegen einen lokalen simulierten PBX. Die Medienquelle ist dabei ein Testobjekt: **Diese Tests öffnen kein echtes Mikrofon und bestätigen keine Audioqualität.**
+Diese Werte beschreiben die lokale Pufferung, nicht die gesamte Gesprächslatenz. Ein gemessener Vergleich auf Android-Geräten liegt nicht vor. Ein adaptiver Jitterpuffer und eine gemeinsame Audio-Lease mit KS/Voice Satellite sind noch nicht umgesetzt.
 
-- Digest-Anmeldung und authentifizierter ausgehender INVITE.
-- Direkter Anruf ohne lokale Annahme.
-- Mikrofonstart erst nach erfolgreicher Gegenstellen-Antwort.
-- Doppelte SIP-Antworten, Abbruch vor dem Klingeln und Annahme/Abbruch-Kollision.
-- Besetzt, eingehende manuelle Annahme, Gegenstellen-Auflegen und Plugin-Stopp.
-- Abweisung von SIP-Antworten aus fremden UDP-Quellen.
-- UDP-Wiederholungen, verspätete Antworten alter Anrufe, Medienfehler und G.711-/SDP-Grundfunktionen.
-- Getrennter Zustand für geöffnetes Overlay und laufenden Anruf.
+## Automatisierte Prüfungen
 
-Der Build erzeugt eine Android-DEX-ZIP mit Manifest und Prüfsumme. GitHub Actions baut den Entwicklungszweig und hängt die ZIP als Workflow-Artefakt an; es wird kein Stable-Release erzeugt.
+`python tools/test_native.py` kompiliert SDK und Plugin gegen die Android-Schnittstellen. SIP-Tests verwenden einen lokalen simulierten Telefonserver und eine simulierte Medienquelle. Sie prüfen:
 
-## Offene Grenzen
+- Digest-Registrierung und authentifizierte SIP-Anfragen.
+- Ausgehende und eingehende Gespräche, Abbruch, Annahme-Kollisionen und Auflegen.
+- UDP-Wiederholungen und Abweisung von Antworten aus fremden Quellen.
+- Getrennte Geräteidentitäten und Gesprächszustände.
+- G.711-Konvertierung, SDP und Ressourcenfreigabe bei Medienfehlern.
+- Begrenzte Audiowarteschlange bei Wiedergabestau, variable Paketgrößen, Duplikate und Sequenzüberlauf.
 
-- Ein externer Anruf mit Lab.3 wurde vom Nutzer erfolgreich bestätigt; er meldete dabei hohe Sprachverzögerung und eine doppelte Nummernanzeige. Die Lab.4-Änderungen benötigen einen erneuten Gerätetest. Es ist kein Android-Gerät für automatisierte Audiomessungen mit dieser Sitzung verbunden.
-- Für eine dauerhafte Integration fehlt die gemeinsame Mikrofon-/Audio-Fokus-Verwaltung mit KS und Voice Satellite. Das Lab blockiert bei erkennbarer Belegung, ersetzt aber keine vom Host koordinierte Audiositzung. Diese Grenze muss vor einer Übernahme gelöst werden.
-- Ein direkt erreichbarer IPv4-Asterisk im LAN, UDP, G.711, eine eigene Nebenstelle pro Gerät und die in HA konfigurierte Hauptrufnummer. Keine SIP-Proxys mit Record-Route, TLS/SRTP, DTMF während des Gesprächs, Halten, Vermitteln oder mehrere gleichzeitige Gespräche auf demselben Kiosk.
-- Kontaktsynchronisation, Favoriten und Kontoauswahl sind noch nicht in den nativen Dialer übertragen.
-- Der RTP-Prototyp nutzt direkte Android-Audio-APIs und lokalen Audio-Fokus, hat aber noch keinen Jitterpuffer und keine eigene Echo-Unterdrückung. Erkannte Aufnahme-/Wiedergabefehler beenden den Anruf; WLAN-Wechsel und ausbleibende RTP-Pakete brauchen weitere Gerätetests und Fehlerbehandlung.
-- SIP-Timer und Abbruchfälle werden erprobt, der SIP-Code ist kein vollständiger RFC-3261-Stack. Kein produktiver Dauereinsatz ohne weitere Prüfung.
+Die Add-on-CI prüft zusätzlich Konfiguration und API sowie reale Asterisk-Instanzen mit mehreren lokalen Testgeräten, Klingelgruppen und Audio-Brücke. Dabei werden fiktive Zugangsdaten verwendet. Diese Prüfungen messen weder die Android-Audioqualität noch die Ende-zu-Ende-Latenz eines Anbieteranschlusses.
 
-## Quellen und Lizenz
+`tools/build.py` erstellt das Android-DEX-Paket. `tools/verify_package.py` kontrolliert Plugin-ID, Manifest, ZIP-Inhalt und SHA-256-Prüfsumme. Die Build-Umgebung benötigt JDK 21 und ein Android-SDK; `JAVA_HOME` und `ANDROID_HOME` verweisen auf diese Installationen.
 
-- [Kiosk Satellite Community SDK](https://github.com/jxlarrea/kiosk-satellite-plugins): SDK-Quellen, KsTheme und Overlay-Vertrag (Apache-2.0).
-- [Navbar](https://github.com/dimatx/kiosk-satellite-navbar): Vorbild für einen langlebigen nativen Overlay mit aufklappenden Bedienelementen. Keine Navbar-Plugin-Quellen übernommen.
-- [meiser79 SIP Phone](https://github.com/meiser79/kiosk-satellite-sip-phone): `SipMessage`, `SipDigest` und die Grundlage für `AndroidG711` (Apache-2.0). Paketnamen und Audio-Lebenszyklus wurden angepasst; der ausgehende SIP-Controller und Dialer wurden hier ergänzt.
+## Herkunft und Lizenz
 
-Attribution steht außerdem in `NOTICE` und im mit der ZIP gelieferten `LICENSE`.
+Die Entwicklung erfolgte zunächst unter der separaten Plugin-ID `kiosk-satellite-sip-native-lab`. Diese ID wird für frühere Testinstallationen verwendet; die aktuelle reguläre ID lautet `kiosk-satellite-sip`.
+
+- [Kiosk Satellite Community SDK](https://github.com/jxlarrea/kiosk-satellite-plugins): SDK, Theme und Overlay-Vertrag.
+- [Navbar](https://github.com/dimatx/kiosk-satellite-navbar): Referenz für native Overlay-Bedienelemente.
+- [SIP Phone](https://github.com/meiser79/kiosk-satellite-sip-phone): Grundlage für SIP-Nachrichten, Digest und G.711-Konvertierung.
+
+Lizenz- und Herkunftsangaben stehen in [NOTICE](../NOTICE) und [LICENSE](../LICENSE).

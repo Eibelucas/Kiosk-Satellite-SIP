@@ -1,6 +1,6 @@
 # Releases 26.10
 
-Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die Git-Tags heißen `v26.10.1`. Plugin und HAOS-Add-on verwenden dieselbe Version, müssen aber separat installiert/aktualisiert werden.
+Versionen folgen dem Format Jahr.Monat.Update, z. B. `26.10.1`. Die Git-Tags heißen `v26.10.1`. Plugin und HAOS-Add-on verwenden dieselbe Version, müssen aber separat installiert/aktualisiert werden.
 
 | Schritt | Release | Inhalt |
 | --- | --- | --- |
@@ -13,13 +13,9 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 | Bereinigung | [26.10.7](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.7) | Allgemeine Dokumentation und neutrale Beispiele |
 | Korrektur | [26.10.8](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.8) | Präzise Heimnetz-Prüfung und kein vorbelegtes Beispielnetz |
 | Audio | [26.10.9](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.9) | Native Intercom-Audio-Brücke für ein Kiosk-Gerät, normales Klingeln, einseitige Durchsage und Echo-Test |
-
 | Oberfläche | [26.10.10](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.10) | Responsive Einrichtung und Telefonseite, weniger Leerraum und kompaktere Übersicht |
-
 | Telefonansicht | [26.10.11](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.11) | Wähltasten als Standard, weniger Text und direkter Kontakte-Befehl |
-
 | Anruferanzeige | [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Eingehende Nummer am Kiosk, Nummernunterdrückung beachten |
-
 | Nativer Dialer | [26.10.13](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.13) | Direkte native SIP-Anrufe, mehrere Geräte, Klingelgruppen, kompakte Gesprächsansicht und begrenzter Audiopuffer |
 
 ## Installieren und aktualisieren
@@ -32,7 +28,7 @@ https://github.com/Eibelucas/Kiosk-Satellite-SIP
 
 Für **Home Assistant → Apps/Add-ons → Store → Repositories** dieselbe URL. Dort **Kiosk Satellite SIP Gateway** installieren, starten und die Weboberfläche öffnen. Die gesamte Einrichtung einschließlich Zugangsdaten erfolgt lokal dort. [Anleitung](kiosk_sip/DOCS.md).
 
-Ab 26.10.13 ersetzt das reguläre Plugin den bisherigen Web-Telefonstarter. Einmalig HAOS-IP, SIP-Port, eigene Nebenstelle und lokales Geräte-SIP-Passwort eintragen. Ein installiertes Lab-Plugin vorher deaktivieren. [Migration](README.md#update-von-261012-oder-vom-lab).
+Ab 26.10.13 ersetzt das reguläre Plugin den bisherigen Web-Telefonstarter. Einmalig HAOS-IP, SIP-Port, eigene Nebenstelle und lokales Geräte-SIP-Passwort eintragen. Ein installiertes Lab-Plugin vorher deaktivieren. [Migration](README.md#updates).
 
 Die Releases sind öffentlich, stabil, kein Draft und kein Pre-Release. Der Workflow `build-plugin.yml` reagiert auf `release: published`, baut den getaggten Quellstand und lädt drei Dateien als `github-actions[bot]` hoch:
 
@@ -47,7 +43,7 @@ Der Upload erfolgt nach Prüfung der ZIP: genau Manifest, `plugin.jar` mit Andro
 [GitHub Actions](https://github.com/Eibelucas/Kiosk-Satellite-SIP/actions) prüft:
 
 - Konfiguration, Migration, Anbieter, Mehrfachkonten und eindeutige Ziel-IDs.
-- Redaktion und Erhalt von Geheimnissen; Konfigurationsdateien mit eingeschränkten Rechten.
+- Ausblenden und Erhalt gespeicherter Zugangsdaten; Konfigurationsdateien mit eingeschränkten Rechten.
 - Socket-basierte HA-Ingress-Prüfung, LAN-Anmeldung, CSRF und Ratenlimits.
 - Ausgehende Anrufe nur auf aktiven normalen Konten; tatsächliche AMI-Anfrage für das ausgewählte Konto.
 - amd64-Docker-Image und echte Asterisk-Instanz.
@@ -60,7 +56,7 @@ Der Upload erfolgt nach Prüfung der ZIP: genau Manifest, `plugin.jar` mit Andro
 - Native Intercom-Signalisierung, HMAC-Token, Annahme/Auflegen, 16-kHz-Audio in beide Richtungen und kein Mikrofon-Rückweg bei Durchsagen.
 - Echten Asterisk-AudioSocket-Pfad mit lokalem Echo und simuliertem Kiosk; kein externer Anruf.
 
-Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwendet. Es wird kein externer Testanruf gewählt. Die unterschiedlichen realen Anbieteranschlüsse, Router-NAT, das Header-Auto-Answer deines Geräts und Home-Assistant-Supervisor auf dem eingesetzten HAOS-System müssen vor Ort geprüft werden.
+Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwendet. Es wird kein externer Testanruf gewählt. Die unterschiedlichen realen Anbieteranschlüsse, Router-NAT, die automatische Anrufannahme des SIP-Geräts und Home-Assistant-Supervisor auf dem eingesetzten HAOS-System müssen vor Ort geprüft werden.
 
 ## Verbleibende Grenze
 
