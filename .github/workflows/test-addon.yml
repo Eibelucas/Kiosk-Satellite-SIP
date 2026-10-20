@@ -29,9 +29,9 @@ jobs:
         run: docker build -t kiosk-sip-test kiosk_sip
       - name: Host-network port conflict and assigned ingress regression
         run: docker run --rm -v "$PWD/tests/host_network_smoke.py:/tmp/host_network_smoke.py:ro" --entrypoint /opt/venv/bin/python kiosk-sip-test /tmp/host_network_smoke.py
-      - name: Asterisk startup and local SIP authentication test
+      - name: Enabled gateway startup and local SIP authentication test
         run: |
-          docker run -d --name kiosk-sip-test kiosk-sip-test
+          docker run -d --name kiosk-sip-test --entrypoint /bin/sh kiosk-sip-test -c 'mkdir -p /data; printf "%s" "{\"enabled\":true,\"listen_address\":\"127.0.0.1\",\"sip_port\":15080}" > /data/telekom.json; exec /opt/venv/bin/python /app/run.py'
           trap 'docker logs kiosk-sip-test; docker rm -f kiosk-sip-test' EXIT
           for attempt in $(seq 1 45); do
             if docker exec kiosk-sip-test asterisk -rx 'core show uptime' | grep -q 'System uptime'; then break; fi
