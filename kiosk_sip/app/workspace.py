@@ -12,7 +12,7 @@ from providers import PROVIDERS
 CONNECTION_KEYS = {"id","name","provider","enabled","auth_mode","auth_username","auth_password",*ACCOUNT_DEFAULTS}
 NUMBER_KEYS = {"id","name","number","connection_id","incoming_mode","incoming_devices","announcement_callers","announcement_pin","announcement_clear_pin","announcement_auto_answer","announcement_max_seconds"}
 DEVICE_KEYS = {"id","name","extension","password","enabled","address","room"}
-CONTACT_KEYS = {"id","name","number","room","favorite"}
+CONTACT_KEYS = {"id","name","number","room","favorite","kind"}
 NETWORK_KEYS = {"listen_address","local_network","external_address","sip_port"}
 AUDIO_KEYS = {"phone_password","audio_target","kiosk_address","kiosk_port","intercom_port","intercom_key"}
 WEB_KEYS = {"lan_enabled","web_username","web_password"}
@@ -125,6 +125,8 @@ def validate_draft(body,previous):
     for raw in objects(body.get("contacts",[]),CONTACT_KEYS,100,"Kontakte"):
         item={key:text(raw.get(key,""),key,80) for key in ("id","name","number","room")}
         if not item["name"] or not re.fullmatch(r"\+?[0-9*#]{3,20}",item["number"]): raise ValueError("Kontaktname und Telefonnummer prüfen.")
+        item["kind"]=raw.get("kind","phone")
+        if not isinstance(item["kind"],str) or item["kind"] not in {"phone","kiosk"}: raise ValueError("Kontaktart prüfen.")
         item["favorite"]=boolean(raw.get("favorite",False),"Favorit")
         draft["contacts"].append(item)
     for section,keys in (("network",NETWORK_KEYS),("audio",AUDIO_KEYS),("web",WEB_KEYS)):

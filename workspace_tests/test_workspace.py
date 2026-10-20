@@ -247,3 +247,19 @@ def test_migration_preserves_legacy_all_targets_and_supports_full_device_capacit
     assert migrated["numbers"][0]["incoming_devices"]==["101"]
     migrated["devices"]= [{"id":"legacy_phone","name":"Legacy","extension":"100","password":"fake-legacy-phone-123","enabled":True,"address":"","room":""}]+[{"id":"device_"+str(ext),"name":"Kiosk "+str(ext),"extension":str(ext),"password":"fake-device-secret-123","enabled":True,"address":"","room":""} for ext in range(101,200)]
     assert len(validate_draft(migrated,migrated)["devices"])==100
+
+
+def test_existing_contact_card_types_survive_migration_and_editing(tmp_path):
+    from workspace import migrate_legacy
+    source=WorkspaceStore(tmp_path/"source");source.save(configured(),0)
+    settings=Settings(tmp_path/"gateway")
+    body=source.compile();body["contacts"]=[{"name":"Entrance","number":"101","kind":"kiosk","room":"Hall","favorite":True}]
+    settings.save(body)
+    migrated=migrate_legacy(settings.value)
+    checked=validate_draft(migrated,migrated)
+    assert checked["contacts"][0]["kind"]=="kiosk"
+    store=WorkspaceStore(settings.directory,settings.value)
+    request=public_request(store);request["contacts"][0]["name"]="Front entrance"
+    store.save(request,0);settings.save(store.compile())
+    assert settings.value["contacts"][0]["kind"]=="kiosk"
+    assert settings.value["contacts"][0]["favorite"] is True

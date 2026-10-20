@@ -162,7 +162,7 @@ function deviceEditor(d){
  '<div class="editor-section"><h3>Geräte-Anmeldung</h3><div class="form-grid">'+field('extension','Eigene Nebenstelle',d.extension||String(ext),{required:true,max:3,readonly:d.extension==='100',help:d.extension==='100'?'Übernommene Nebenstelle · bestehende Anmeldung bleibt erhalten':'101 bis 199 · eine Nebenstelle pro Gerät'})+field('password','Geräte-SIP-Passwort','',{type:'password',minLength:12,max:256,placeholder:d.password_set?'Gespeichert · leer lassen zum Behalten':'Mindestens zwölf Zeichen'})+'</div><p class="inline-info">Diese Nebenstelle und dieses Gerätepasswort gehören in das native SIP-Plugin des Kiosks. Die Anbieter-Zugangsdaten bleiben am SIP-Zugang.</p></div>'+
  switchField('enabled','Kiosk aktivieren',d.enabled!==false,'Kann nach dem Anwenden Anrufe annehmen.');
 }
-function contactEditor(c){return field('name','Kontaktname',c.name||'',{required:true,max:80})+field('number','Telefonnummer',c.number||'',{required:true,type:'tel',max:20})+field('room','Raum / Notiz',c.room||'',{max:80})+switchField('favorite','Als Favorit anzeigen',c.favorite===true);}
+function contactEditor(c){return field('name','Kontaktname',c.name||'',{required:true,max:80})+field('number','Telefonnummer',c.number||'',{required:true,type:'tel',max:20})+field('kind','Darstellung',c.kind||'phone',{options:[{value:'phone',label:'Telefonkontakt'},{value:'kiosk',label:'Kiosk / Raumkarte'}]})+field('room','Raum / Notiz',c.room||'',{max:80})+switchField('favorite','Als Favorit anzeigen',c.favorite===true);}
 function audioEditor(){
  const a=draft.audio;
  return '<p class="inline-info">Native Kiosks verwenden ihre eigenen Nebenstellen. Hier liegen die alternative Einzelanmeldung und die optionale Intercom-Brücke.</p>'+
@@ -195,7 +195,7 @@ async function saveEditor(event){
  }else if(kind==='devices'){
   for(const key of ['name','room','address','extension','password','enabled'])value[key]=formValue(form,key);
  }else if(kind==='contacts'){
-  for(const key of ['name','number','room','favorite'])value[key]=formValue(form,key);
+  for(const key of ['name','number','room','favorite','kind'])value[key]=formValue(form,key);
   value.number=value.number.replace(/\s/g,'');
  }else if(kind==='audio'){
   for(const key of ['phone_password','audio_target','kiosk_address','intercom_key'])next.audio[key]=formValue(form,key);
