@@ -1,3 +1,8 @@
+# 26.10.15
+
+- Correct the manifest icon name to be relative to the assets directory, as required by Kiosk Satellite.
+- Keep the icon at assets/icon.png in the release ZIP and validate the asset path during packaging.
+
 # 26.10.14
 
 - Add a 256 × 256 plugin icon to the manifest and release package.
