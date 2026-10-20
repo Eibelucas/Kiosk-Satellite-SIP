@@ -18,6 +18,8 @@ Versions use the year.month.update format, for example `26.10.1`. Git tags inclu
 | [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Incoming caller number display and caller privacy handling |
 | [26.10.13](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.13) | Native SIP calls, multiple devices, ring groups, compact call view, and bounded audio buffering |
 
+| [26.10.14](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.14) | Plugin icon, installation badge, and installation instructions |
+
 ## Installing and updating
 
 Repository URL for **Kiosk Satellite → Plugin Manager → Add plugin**:
@@ -36,7 +38,7 @@ Regular releases are public stable releases. The `build-plugin.yml` workflow res
 - `kiosk-satellite-plugin.json`
 - `kiosk-satellite-sip-VERSION.zip.sha256`
 
-Before upload, the ZIP is checked for exactly three root entries: the manifest, `plugin.jar` containing Android DEX, and `LICENSE`. The manifest inside the ZIP must be byte-identical to the standalone asset. The SHA-256 file records the actual ZIP hash and filename. Every plugin build runs these checks.
+Before upload, the ZIP is checked for three required root files: the manifest, `plugin.jar` containing Android DEX, and `LICENSE`, plus the declared icon at `assets/icon.png`. The icon must be a 256 × 256 PNG no larger than 256 KB. The manifest inside the ZIP must be byte-identical to the standalone asset. The SHA-256 file records the actual ZIP hash and filename. Every plugin build runs these checks.
 
 ## Automated checks
 

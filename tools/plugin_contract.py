@@ -14,6 +14,10 @@ def validate_manifest(manifest):
         value = manifest.get(key)
         if not isinstance(value, str) or not value.strip() or len(value) > limit:
             raise ValueError(f'Invalid {key}')
+    icon = manifest.get('icon')
+    if icon is not None and (not isinstance(icon, str) or
+                             not re.fullmatch(r'assets/[a-zA-Z0-9_-]+\.png', icon)):
+        raise ValueError('Icon must be a PNG file directly under assets/')
     settings = manifest.get('settings', [])
     if not isinstance(settings, list) or len(settings) > 50:
         raise ValueError('Invalid settings')

@@ -78,6 +78,8 @@ with tempfile.TemporaryDirectory(prefix='kiosk-sip-plugin-') as temp_name:
         archive.writestr('kiosk-satellite-plugin.json', manifest_bytes)
         archive.write(plugin_jar, 'plugin.jar')
         archive.write(ROOT / 'LICENSE', 'LICENSE')
+        if manifest.get('icon'):
+            archive.write(ROOT / manifest['icon'], manifest['icon'])
 
     if package.stat().st_size > MAX_BYTES:
         package.unlink()

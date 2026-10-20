@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "kiosk-satellite-sip",
   "name": "Kiosk Satellite SIP",
-  "version": "26.10.13",
+  "version": "26.10.14",
   "minAndroidSdk": 24,
   "entryClass": "de.eibelucas.kiosksip.nativephone.NativePhonePlugin",
   "description": "Nativer Telefonknopf mit ausklappbarem Dialer, direkten SIP-Anrufen und eigenen Nebenstellen für mehrere Kiosks.",
@@ -87,5 +87,6 @@
       "id": "hangup",
       "title": "Gespräch beenden"
     }
-  ]
+  ],
+  "icon": "assets/icon.png"
 }
