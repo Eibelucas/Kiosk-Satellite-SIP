@@ -78,7 +78,10 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
                 });}
                 public void call(String state,String peer,String detail){main.post(()->{
                     if(rev!=generation||host==null)return;
-                    if(state.equals("idle")||state.equals("error")){preparing=false;if(wake!=null)wake.release();}
+                    if(state.equals("idle")||state.equals("error")||state.equals("incoming")){
+                        // An incoming dialog can arrive while an outgoing call is still acquiring audio.
+                        preparing=false;if(wake!=null)wake.release();
+                    }
                     model.update(state,peer,text.get(detail));
                     if(state.equals("incoming")){
                         try{host.executeCommand("screenOn",Collections.emptyMap(),(ok,data,error)->{});}catch(Exception ignored){}
