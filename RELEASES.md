@@ -1,63 +1,65 @@
 # Releases 26.10
 
-Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die Git-Tags heißen `v26.10.1`. Plugin und HAOS-Add-on verwenden dieselbe Version, müssen aber separat installiert/aktualisiert werden.
+Versions use the year.month.update format, for example `26.10.1`. Git tags include a `v` prefix, such as `v26.10.1`. The plugin and HAOS add-on use the same version but must be installed or updated separately.
 
-| Schritt | Release | Inhalt |
-| --- | --- | --- |
-| 1 | [26.10.1](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.1) | HAOS-Add-on mit Asterisk und Telekom-Onboarding |
-| 2 | [26.10.2](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.2) | Mehrere Anbieter und manuelle SIP-Profile |
-| 3 | [26.10.3](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.3) | Getrennte Rufnummern, normale Hauptrufnummer, Migration |
-| 4 | [26.10.4](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.4) | Separate Durchsage-Nummer, Absenderliste, optionale PIN, einseitiges Audio |
-| 5 | [26.10.5](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.5) | Kontakte als Kiosk-/Raumkarten, Favoriten, Suche und vollständige Anleitung |
-| Korrektur | [26.10.6](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.6) | Dynamischer HA-Ingress-Port und erreichbare Einrichtung bei SIP-/LAN-Portkonflikten |
-| Bereinigung | [26.10.7](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.7) | Allgemeine Dokumentation und neutrale Beispiele |
-| Korrektur | [26.10.8](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.8) | Präzise Heimnetz-Prüfung und kein vorbelegtes Beispielnetz |
-| Audio | [26.10.9](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.9) | Native Intercom-Audio-Brücke für ein Kiosk-Gerät, normales Klingeln, einseitige Durchsage und Echo-Test |
+| Version | Changes |
+| --- | --- |
+| [26.10.1](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.1) | HAOS add-on with Asterisk and Telekom setup |
+| [26.10.2](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.2) | Multiple providers and manual SIP profiles |
+| [26.10.3](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.3) | Separate number accounts, default outgoing number, and migration |
+| [26.10.4](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.4) | Dedicated announcement number, caller allowlist, optional PIN, and one-way audio |
+| [26.10.5](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.5) | Contact and kiosk cards, favorites, search, and setup guide |
+| [26.10.6](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.6) | Dynamic HA ingress port and setup access during SIP/LAN port conflicts |
+| [26.10.7](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.7) | General documentation and neutral examples |
+| [26.10.8](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.8) | Precise local-network validation and no prefilled example network |
+| [26.10.9](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.9) | Native intercom audio bridge for one kiosk, incoming calls, announcements, and echo test |
+| [26.10.10](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.10) | Responsive setup and web phone page |
+| [26.10.11](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.11) | Default keypad view and direct contacts command |
+| [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Incoming caller number display and caller privacy handling |
+| [26.10.13](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.13) | Native SIP calls, multiple devices, ring groups, compact call view, and bounded audio buffering |
 
-| Oberfläche | [26.10.10](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.10) | Responsive Einrichtung und Telefonseite, weniger Leerraum und kompaktere Übersicht |
+## Installing and updating
 
-| Telefonansicht | [26.10.11](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.11) | Wähltasten als Standard, weniger Text und direkter Kontakte-Befehl |
-
-| Anruferanzeige | [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Eingehende Nummer am Kiosk, Nummernunterdrückung beachten |
-
-## Installieren und aktualisieren
-
-Repository-URL für **Kiosk Satellite → Plugin-Manager → Repository hinzufügen**:
+Repository URL for **Kiosk Satellite → Plugin Manager → Add plugin**:
 
 ```text
 https://github.com/Eibelucas/Kiosk-Satellite-SIP
 ```
 
-Für **Home Assistant → Apps/Add-ons → Store → Repositories** dieselbe URL. Dort **Kiosk Satellite SIP Gateway** installieren, starten und die Weboberfläche öffnen. Die gesamte Einrichtung einschließlich Zugangsdaten erfolgt lokal dort. [Anleitung](kiosk_sip/DOCS.md).
+Use the same URL under **Home Assistant → Apps/Add-ons → Store → Repositories**. Install and start **Kiosk Satellite SIP Gateway**, then open its web interface. Provider and device configuration is managed locally there. See the [setup guide](kiosk_sip/DOCS.md).
 
-Die Releases sind öffentlich, stabil, kein Draft und kein Pre-Release. Der Workflow `build-plugin.yml` reagiert auf `release: published`, baut den getaggten Quellstand und lädt drei Dateien als `github-actions[bot]` hoch:
+Starting with 26.10.13, the regular plugin replaces the web phone launcher. Enter the HAOS address, SIP port, extension, and device password once. Disable any separate Lab plugin before enabling the regular plugin. See [migration](README.md#updates).
+
+Regular releases are public stable releases. The `build-plugin.yml` workflow responds to `release: published`, builds the tagged source, and uploads three files as `github-actions[bot]`:
 
 - `kiosk-satellite-sip-VERSION.zip`
 - `kiosk-satellite-plugin.json`
 - `kiosk-satellite-sip-VERSION.zip.sha256`
 
-Der Upload erfolgt nach Prüfung der ZIP: genau Manifest, `plugin.jar` mit Android-DEX und `LICENSE` im Root. Das Manifest in der ZIP und als Asset muss bytegleich sein. Die SHA-256-Datei enthält den tatsächlichen ZIP-Hash und den Dateinamen. Die Prüfung läuft in jedem Plugin-Build, auch für neue stabile Releases.
+Before upload, the ZIP is checked for exactly three root entries: the manifest, `plugin.jar` containing Android DEX, and `LICENSE`. The manifest inside the ZIP must be byte-identical to the standalone asset. The SHA-256 file records the actual ZIP hash and filename. Every plugin build runs these checks.
 
-## Automatisierte Prüfungen
+## Automated checks
 
-[GitHub Actions](https://github.com/Eibelucas/Kiosk-Satellite-SIP/actions) prüft:
+[GitHub Actions](https://github.com/Eibelucas/Kiosk-Satellite-SIP/actions) checks:
 
-- Konfiguration, Migration, Anbieter, Mehrfachkonten und eindeutige Ziel-IDs.
-- Redaktion und Erhalt von Geheimnissen; Konfigurationsdateien mit eingeschränkten Rechten.
-- Socket-basierte HA-Ingress-Prüfung, LAN-Anmeldung, CSRF und Ratenlimits.
-- Ausgehende Anrufe nur auf aktiven normalen Konten; tatsächliche AMI-Anfrage für das ausgewählte Konto.
-- amd64-Docker-Image und echte Asterisk-Instanz.
-- Echte lokale SIP-Digest-Anmeldung mit Sonderzeichen im Passwort.
-- Lokalen DNS-Testserver für SIP-SRV und drei lokale SIP-Anbieterkonten.
-- Normales Klingeln auf der Hauptnummer, Abweisung der zweiten Nummer und unbekannter Ziele.
-- Abweisung fremder/anonymer Absender auf der Durchsage-Nummer.
-- Auto-Answer-Header nur auf der Durchsage, tatsächliche RTP-Übertragung zum Ziel und stummes Zielmikrofon.
-- Kontakt-/Kiosk-Karten und JavaScript-Syntax.
-- Native Intercom-Signalisierung, HMAC-Token, Annahme/Auflegen, 16-kHz-Audio in beide Richtungen und kein Mikrofon-Rückweg bei Durchsagen.
-- Echten Asterisk-AudioSocket-Pfad mit lokalem Echo und simuliertem Kiosk; kein externer Anruf.
+- Configuration, migration, provider accounts, and unique incoming destination IDs.
+- Redaction and preservation of credentials, and restricted configuration file permissions.
+- HA ingress, LAN authentication, CSRF protection, and rate limits.
+- Outgoing calls on enabled normal accounts and the AMI request for the selected web phone account.
+- The amd64 Docker image and a real Asterisk instance.
+- SIP Digest authentication, including passwords with special characters.
+- Local SIP-SRV resolution and multiple simulated provider accounts.
+- Incoming routing, rejected numbers, and unknown destinations.
+- Announcement allowlists, PINs, automatic-answer headers, and one-way RTP audio.
+- Web contacts, kiosk cards, and JavaScript syntax.
+- Intercom signaling, signed callbacks, answer/hangup behavior, and two-way 16 kHz audio.
+- The Asterisk AudioSocket path with a local echo target and simulated kiosk.
+- Native SIP call state and bounded audio queues under playback stalls.
 
-Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwendet. Es wird kein externer Testanruf gewählt. Die unterschiedlichen realen Anbieteranschlüsse, Router-NAT, das Header-Auto-Answer deines Geräts und Home-Assistant-Supervisor auf dem eingesetzten HAOS-System müssen vor Ort geprüft werden.
+These checks use fictional credentials and local test servers. Real provider compatibility, router NAT, device audio, and Home Assistant Supervisor behavior require validation in the deployment environment.
 
-## Verbleibende Grenze
+## Remaining limitations
 
-Audio geht wahlweise über SIP-Telefon **100** oder die native Audio-Brücke zu einem konfigurierten Kiosk Satellite Intercom. Kiosk-Audio verwendet derzeit lokale HTTP/WS-Verbindungen; TLS-Intercom wird abgewiesen und bleibt unverändert. Kiosk-Karten sind die Darstellung von Kontakten im Anrufpad, keine automatisch registrierten nativen Intercom-Peers. TLS/SRTP, reine IP-authentifizierte Trunks und gemeinsame Trunk-Registrierungen für mehrere Durchwahlen sind keine fertigen Profile.
+The regular plugin uses native SIP audio with a separate device extension and manual acceptance of incoming calls. Shared microphone coordination with KS/Voice Satellite and measured latency comparisons remain open.
+
+The alternative web phone page uses a SIP phone or the audio bridge to one configured Kiosk Satellite intercom device. The bridge uses local HTTP/WebSocket connections and does not support TLS intercom. Kiosk cards are web contact entries. TLS/SRTP, IP-authenticated trunks, and shared trunk registrations for multiple direct-dial numbers are not complete supported profiles.

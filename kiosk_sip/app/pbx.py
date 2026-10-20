@@ -1,6 +1,7 @@
 """Asterisk lifecycle, read-only diagnostics and local AMI call setup."""
 import grp
 import os
+import re
 import socket
 import subprocess
 import threading
@@ -8,7 +9,7 @@ import time
 import uuid
 from pathlib import Path
 
-from configuration import asterisk_files, effective_lines, DESTINATION
+from configuration import asterisk_files, effective_lines, sip_devices, DESTINATION
 from networking import PortConflict, check_port
 from intercom import IntercomBridge
 
@@ -102,9 +103,12 @@ class Pbx:
                            "enabled": line["enabled"], "incoming_mode": line["incoming_mode"], "registered": registered, "state": state})
         selected = next((line for line in states if line["id"] == self.settings.value.get("outbound_line", "main")), {})
         phone_ready = any("100/sip:" in row and (" Avail" in row or " NonQual" in row) for row in phone.splitlines())
+        devices = [{"extension": d["extension"], "name": d["name"], "enabled": d["enabled"],
+                    "registered": bool(d["enabled"] and any(re.search(r"^\s*" + re.escape(d["extension"]) + r"/sip:", row) and (" Avail" in row or " NonQual" in row) for row in phone.splitlines()))}
+                   for d in sip_devices(self.settings.value)]
         return {"asterisk_running": running, "provider_registered": selected.get("registered", False),
                 "telekom_registered": selected.get("registered", False), "registration_state": selected.get("state", "deaktiviert"),
-                "phone_registered": phone_ready, "lines": states, "outbound_line": self.settings.value.get("outbound_line", "main"),
+                "phone_registered": phone_ready, "devices": devices, "lines": states, "outbound_line": self.settings.value.get("outbound_line", "main"),
                 "audio_target": self.settings.value.get("audio_target", "sip"),
                 "media_bridge": self.bridge is not None,
                 "intercom": self.bridge.status() if self.bridge else None,
@@ -165,4 +169,4 @@ class Pbx:
                     raise RuntimeError("Asterisk hat den Rückruf abgelehnt.")
                 return {"message": "Kiosk wird angerufen. Am Kiosk annehmen; danach startet der lokale Echo-Test." if native and local_test else
                         "Kiosk wird angerufen. Am Kiosk annehmen; erst danach wird die Zielnummer gewählt." if native else
-                        "Rückruf angefordert. Nimm dein SIP-Telefon 100 an; danach wird die Zielnummer gewählt."}
+                        "Rückruf angefordert. Nach Annahme am SIP-Telefon 100 wird die Zielnummer gewählt."}

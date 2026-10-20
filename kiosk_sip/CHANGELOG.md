@@ -1,106 +1,112 @@
+# 26.10.13
+
+- Native SIP dialer with a floating phone button and direct outgoing call setup.
+- Call view with destination, status, duration, mute, hangup, and centered icons.
+- Separate SIP devices 101–199 with individual passwords and ring groups per external number. Extension 100 remains compatible.
+- Separate RTP reception and playback, a PCM queue bounded to 60 ms, and smaller Android buffer requests.
+- Existing plugin ID `kiosk-satellite-sip`; updating from the web phone launcher requires one-time SIP configuration. [Update guide](../README.md#updates).
+
 # 26.10.12
 
-- Eingehende Kiosk-Anrufe zeigen die vom Anbieter übermittelte Anrufernummer statt des SIP-Kontonamens wie „Hauptrufnummer“.
-- Asterisk-Nummernunterdrückung wird beachtet: „Anonym“ bei unterdrückter Nummer, „Unbekannter Anrufer“ bei fehlender oder ungültiger Nummer.
-- Die Nummer wird ausschließlich für die lokale KS-Anrufanzeige verwendet; keine neue Speicherung in Status, Konfiguration oder Protokollen.
-- Tests prüfen die Anzeige über FastAGI und den Intercom-Aufruf sowie mit echtem Asterisk und fiktiven Anruferdaten.
-- Rufnummernkonfiguration, ausgehender Ablauf, Audio und Durchsage-Berechtigungen bleiben unverändert.
+- Incoming kiosk calls display the caller number supplied by the provider instead of the account label.
+- Asterisk caller privacy is respected: anonymous calls and missing or invalid caller numbers have separate display labels.
+- Caller numbers are used only for the local KS call display, without new storage in status, configuration, or logs.
+- Tests cover FastAGI, intercom callbacks, and real Asterisk with fictional caller data.
+- Number configuration, outgoing call flow, audio, and announcement permissions are unchanged.
 
 # 26.10.11
 
-- Telefonseite ohne Überschrift und Erklärungstext oben; Verbindungsstatus kompakt in der Seitenleiste.
-- Wähltasten als Standardansicht, bereits vor dem Laden der Kontakte. Das Laden wechselt eine inzwischen gewählte Ansicht nicht zurück.
-- Neuer Plugin-Befehl „Kontakte öffnen“ als direkter Zugriff auf die bestehenden Kontakte und Favoriten.
-- Telefonnummern werden durch Auswahl eines Kontakts nur vorbereitet; „Anrufen“ und Bestätigung bleiben erforderlich.
-- Die native KS-Gegensprechliste wird nicht erweitert: SDK 1 bietet keine Telefonkontakt- oder Schnellwahl-Schnittstelle. Eine native Integration benötigt eine Erweiterung von Kiosk Satellite.
-- Gespeicherte Kontakte, Rufnummern, Einstellungen und SIP-/Audio-Abläufe bleiben erhalten.
+- Web phone page with a compact sidebar connection status and no introductory heading.
+- The keypad is the default view before contacts load. Loading contacts preserves an already selected view.
+- A direct contacts command opens existing contacts and favorites.
+- Selecting a contact prepares a number; calling still requires the call action and confirmation.
+- The native KS intercom list is unchanged. SDK 1 has no phone-contact or speed-dial registration API.
+- Stored contacts, numbers, settings, and SIP/audio behavior are preserved.
 
 # 26.10.10
 
-- Einrichtung nutzt breite Bildschirme: Formular und Verbindungsstatus stehen nebeneinander, zusammengehörige Felder in zwei Spalten.
-- Telefonseite mit kompakter Seitenleiste, mehreren Kontaktspalten und einem platzsparenden Wählfeld mit großen Tasten.
-- Auf schmalen Displays stehen die Bereiche untereinander; lange Status- und Kontakttexte können umbrechen.
-- Weiterführende Testhinweise lassen sich aufklappen. Kiosk-Echo-Test und Verbindungsprüfung bleiben direkt erreichbar.
-- Anleitung für Kiosk-Audio und sichere lokale Echo-Tests korrigiert. Keine Änderung an SIP-/Audio-Abläufen oder gespeicherten Einstellungen.
-- Isolierter SIP-Test registriert seine drei simulierten Konten mit kurzer Staffelung und Wiederholungszeit, um gleichzeitige Transaktionskonflikte zu vermeiden. Produktionszeiten bleiben unverändert.
+- Setup uses wide screens with the form and status side by side and related fields in two columns.
+- Compact web phone sidebar, multiple contact columns, and a smaller keypad with large controls.
+- Sections stack on narrow screens; long contact and status text can wrap.
+- Additional test guidance is expandable; kiosk echo and connection checks remain accessible.
+- Corrected kiosk audio and local echo documentation without changing SIP/audio behavior or stored settings.
+- The isolated SIP test staggers its three simulated account registrations and retry timing to avoid transaction collisions. Production timing is unchanged.
 
 # 26.10.9
 
-- Audio-Ziel Kiosk Satellite Intercom: Asterisk-20-AudioSocket mit 8-kHz-PCM, Umwandlung auf 16 kHz und nativer Intercom-WebSocket-Verbindung.
-- Normale Anrufe klingeln am Kiosk; erst Annehmen öffnet Audio und verbindet den Anruf.
-- Separate Durchsagen behalten Absenderliste/PIN/Dauerlimit und verwenden einseitigen Kiosk-Intercom-Modus.
-- Signierte Rückmeldungen, Token-Wiederverwendungsschutz, lokale Schlüsselablage ohne Ausgabe in Status/API/Logs.
-- Verbindung prüfen und lokaler Kiosk-Echo-Test im Assistenten. Eigene Geräte-IP, Identitätsport und gemeinsamer Schlüssel.
-- Der Kiosk-Intercom-Port wird aus seiner Identität übernommen. Ein konfiguriertes Kiosk-Gerät, lokales HTTP/WS; verschlüsseltes Intercom wird abgewiesen und nicht umgestellt.
-- Das bisherige SIP-Telefon 100 bleibt als alternative Audio-Ausgabe erhalten.
+- Kiosk Satellite intercom audio target using Asterisk 20 AudioSocket at 8 kHz, conversion to 16 kHz, and a native intercom WebSocket.
+- Normal calls ring the kiosk; accepting opens audio and connects the call.
+- Dedicated announcements retain allowlists, PINs, and duration limits and use one-way kiosk intercom audio.
+- Signed callbacks, replay protection, and local keys excluded from status/API/log output.
+- Connection check and local kiosk echo test in the setup assistant.
+- The intercom listener port is obtained from device identity. One configured kiosk and local HTTP/WebSocket connections are supported; encrypted intercom is rejected without changing device settings.
+- SIP phone 100 remains available as an alternative audio output.
 
 # 26.10.8
 
-- Unterscheidet private Geräte-IP, falsches Heimnetz und unzulässige Netz-/Broadcast-Adressen in der Fehlermeldung.
-- Bei der Ersteinrichtung ist kein Beispielnetz mehr vorbelegt; das eigene Netz muss ausdrücklich eingetragen werden.
-- Die Zusammenfassung zeigt das eingetragene Heimnetz mit Netzmaske.
-- Bestehende lokale Konfigurationen und SIP-Funktionen bleiben erhalten.
+- Validation distinguishes private device addresses, incorrect local networks, and invalid network/broadcast addresses.
+- Initial setup no longer prefills an example network; the deployment network must be entered.
+- The summary shows the configured network and prefix.
+- Existing local configuration and SIP functionality are preserved.
 
 # 26.10.7
 
-- Allgemeine HAOS-Anleitung ohne persönliche Hardwarebezüge.
-- Neutrale Eingabehinweise statt ortsbezogener Rufnummern- und Netzbeispiele.
-- Tests verwenden ausdrücklich fiktive Rufnummern und ein unabhängiges Testnetz.
-- Standalone-Gateway startet ohne voreingestellten Beispielkontakt.
-- Bestehende lokale Anschlussdaten werden nicht verändert.
+- General HAOS guide without hardware-specific personal references.
+- Neutral field guidance instead of location-specific number and network examples.
+- Tests use fictional phone numbers and an independent test network.
+- The standalone gateway starts without a preconfigured example contact.
+- Existing local account data is unchanged.
 
 # 26.10.6
 
-- HA-Ingress nutzt den Supervisor-Port statt fest 8099; behebt `Address in use` beim Start im Host-Netzwerk.
-- Bei belegtem SIP-/AMI-Port bleibt die HA-Einrichtung offen und zeigt einen konkreten Hinweis; nach Korrektur ist Speichern erneut möglich.
-- Bei belegtem LAN-Webport bleibt HA-Ingress offen; Gateway-Port in der Add-on-Konfiguration ändern und neu starten.
-- Asterisk gilt erst mit beiden geladenen SIP-Transporten als bereit. Fehlstarts werden aufgeräumt.
-- Regressionsprüfung mit belegten Ports 8099/5070, simuliertem Supervisor, Zugriffsschutz und sauberem Beenden.
-- Anschlussdaten bleiben erhalten. Audio-Bridge zu Kiosk Satellite weiterhin nicht implementiert.
+- HA ingress uses the Supervisor-assigned port instead of fixed port 8099, resolving host-network startup conflicts.
+- Setup stays accessible during SIP/AMI port conflicts and supports saving after correction.
+- During LAN web port conflicts, HA ingress remains accessible so the gateway port can be changed.
+- Asterisk is ready only after both SIP transports load. Failed starts are cleaned up.
+- Regression coverage for occupied ports 8099/5070, a simulated Supervisor, access control, and clean shutdown.
+- Existing account data is preserved. The kiosk intercom audio bridge was not implemented in this version.
 
 # 26.10.5
 
-- Kontakte als Kiosk-/Raumkarten mit Favoriten und Suche anzeigen.
-- Kontaktbearbeitung im HA-Assistenten; normale Kontakte aus älteren Versionen bleiben erhalten.
-- Karte auswählen bereitet den Anruf vor; kein automatisches Wählen.
-- Vollständige Anbieter-, Rufnummern-, Durchsage- und Update-Anleitung im Repository.
+- Contacts displayed as kiosk/room cards with favorites and search.
+- Contact editing in the HA assistant; existing contacts are preserved.
+- Selecting a card prepares a call without dialing automatically.
+- Complete provider, number, announcement, and update documentation.
 
 # 26.10.4
 
-- Separate Durchsage-Rufnummer mit erlaubten Absendernummern.
-- Einseitiger Audio-Pfad zum SIP-Telefon/Lautsprecher 100; Zielmikrofon bleibt stumm.
-- Optionaler Auto-Answer per SIP-Header, nur für die Durchsage-Rolle.
-- Optionale sechsstellige PIN, begrenzte Dauer und Schutz vor parallelen Durchsagen.
-- Normale Anrufe behalten normales Klingeln und normale Hauptrufnummer.
+- Dedicated announcement number with allowed caller numbers.
+- One-way audio to SIP phone/speaker 100; the target microphone remains muted.
+- Optional automatic answer through SIP headers for announcements only.
+- Optional six-digit PIN, bounded duration, and protection against parallel announcements.
+- Normal calls retain standard ringing and the default outgoing number.
 
 # 26.10.3
 
-- Bis zu acht getrennte Rufnummernkonten mit eigenen Anbietern, Zugangsdaten und Status.
-- Hauptrufnummer für normale ausgehende Anrufe, weitere normale Rufnummern im Anrufpad auswählbar.
-- Eingehend normale Anrufe oder Abweisen; unbekannte Zielnummern werden abgewiesen.
-- Eindeutiges Routing auch bei mehreren Konten auf demselben SIP-Registrar.
-- Bestehende Einzelkonto-Konfiguration wird übernommen.
+- Up to eight separate number accounts with individual providers, credentials, and status.
+- Default outgoing number, with other normal numbers selectable in the web dialer.
+- Incoming calls can ring or be rejected; unknown destinations are rejected.
+- Unique routing for multiple accounts on the same SIP registrar.
+- Existing single-account configuration is migrated.
 
 # 26.10.2
 
-- Anbieter-Auswahl: Telekom, sipgate, easybell, FRITZ!Box und manuelle Profile für Vodafone, 1&1, o2 und eigene SIP-Konten.
-- Individuelle SIP-ID, Registrar, Domain, Proxy, Realm sowie UDP/TCP.
-- Gespeicherte Zugangsdaten werden bei Anbieterwechsel nicht übernommen.
-- Release-ZIP und SHA-256 werden vor dem Upload geprüft.
+- Provider selection for Telekom, sipgate, easybell, FRITZ!Box, and manual Vodafone, 1&1, o2, or custom accounts.
+- Individual SIP ID, registrar, domain, proxy, realm, and UDP/TCP.
+- Stored credentials are not reused after changing the provider.
+- Release ZIP and SHA-256 are checked before upload.
 
 # 26.10.1
 
-- HAOS-Add-on mit Asterisk und deutschem Telekom-Onboarding.
-- Geschützte HA-Einrichtung, lokale Telefonseite und SIP-Nebenstelle 100.
-- Echte lokale SIP-Anmeldung mit Sonderzeichen im Passwort wird in CI geprüft.
+- HAOS add-on with Asterisk and a German-language Telekom setup flow.
+- Protected HA setup, local web phone page, and SIP extension 100.
+- CI verifies real local SIP registration with special characters in the password.
 
-# Changelog
+# 0.1.0
 
-## 0.1.0
-
-- HAOS-Add-on mit Asterisk 20 aus Alpine Linux.
-- Deutsches Onboarding für Telekom Privatkunden.
-- Lokale Speicherung von Zugangsdaten, Ingress-Einrichtung und gesicherter LAN-Zugang.
-- Registrierung von SIP-Telefon 100, Echo-Test 600 und Anrufauslösung über lokalen AMI.
-- Statusanzeige für Asterisk, Telekom-Registrierung und SIP-Telefon.
-- Keine Kiosk-Intercom-Audio-Bridge enthalten.
+- HAOS add-on with Asterisk 20 from Alpine Linux.
+- German-language setup for Telekom residential service.
+- Local credential storage, ingress setup, and protected LAN access.
+- SIP phone 100 registration, echo test 600, and call setup through local AMI.
+- Status for Asterisk, provider registration, and the SIP phone.
+- No kiosk intercom audio bridge in this version.

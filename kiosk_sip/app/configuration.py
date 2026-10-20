@@ -14,7 +14,7 @@ DEFAULTS = {
     "auth_mode": "access", "auth_username": "anonymous@t-online.de",
     "auth_password": "", "listen_address": "127.0.0.1",
     "local_network": "10.99.0.0/24", "external_address": "",
-    "sip_port": 5070, "phone_password": "", "lan_enabled": False,
+    "sip_port": 5070, "phone_password": "", "devices": [], "lan_enabled": False,
     "audio_target": "sip", "kiosk_address": "", "kiosk_port": 2324,
     "intercom_port": 8090, "intercom_key": "",
     "web_username": "kiosk", "web_password_hash": "", "contacts": [], "lines": [], "outbound_line": "main", **ACCOUNT_DEFAULTS,
@@ -49,7 +49,53 @@ def secret_value(value, label, minimum=0):
 
 ACCOUNT_FIELDS = {"enabled", "provider", "phone_number", "auth_mode", "auth_username", "auth_password"} | set(ACCOUNT_DEFAULTS)
 ANNOUNCEMENT_DEFAULTS = {"announcement_callers": [], "announcement_pin": "", "announcement_auto_answer": False, "announcement_max_seconds": 180}
-LINE_FIELDS = ACCOUNT_FIELDS | {"id", "label", "incoming_mode"} | set(ANNOUNCEMENT_DEFAULTS) | {"announcement_clear_pin"}
+LINE_FIELDS = ACCOUNT_FIELDS | {"id", "label", "incoming_mode", "incoming_devices"} | set(ANNOUNCEMENT_DEFAULTS) | {"announcement_clear_pin"}
+
+
+def validate_devices(raw_devices, previous=()):
+    if not isinstance(raw_devices, list) or len(raw_devices) > 99:
+        raise ValueError("Höchstens 99 Geräte mit Nebenstellen 101 bis 199 einrichten.")
+    old = {d["extension"]: d for d in previous}
+    devices, extensions = [], set()
+    for raw in raw_devices:
+        if not isinstance(raw, dict) or set(raw) - {"extension", "name", "password", "enabled"}:
+            raise ValueError("Ungültiger Geräteeintrag.")
+        extension = raw.get("extension")
+        if not isinstance(extension, str) or not re.fullmatch(r"1[0-9]{2}", extension) or extension == "100":
+            raise ValueError("Jedes Gerät benötigt eine Nebenstelle von 101 bis 199. 100 bleibt reserviert.")
+        if extension in extensions:
+            raise ValueError("Jede Geräte-Nebenstelle darf nur einmal vorkommen.")
+        name = raw.get("name", "")
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80:
+            raise ValueError("Jedes Gerät benötigt einen Namen.")
+        name = secret_value(name.strip(), "Gerätename")
+        enabled = raw.get("enabled", True)
+        if type(enabled) is not bool:
+            raise ValueError("Ungültiger Geräteschalter.")
+        password = raw.get("password", "")
+        if not isinstance(password, str):
+            raise ValueError("Ungültiges Gerätepasswort.")
+        password = secret_value(password or old.get(extension, {}).get("password", ""), "Geräte-SIP-Passwort", 12)
+        devices.append({"extension": extension, "name": name, "enabled": enabled, "password": password})
+        extensions.add(extension)
+    return devices
+
+
+def sip_devices(cfg):
+    """Every endpoint has its own AOR and secret; 100 is retained for older clients."""
+    legacy = [{"extension": "100", "name": "Telefon 100", "password": cfg["phone_password"], "enabled": True}] if cfg.get("phone_password") else []
+    return legacy + list(cfg.get("devices", []))
+
+
+def incoming_devices(cfg, line):
+    enabled = {d["extension"]: d for d in sip_devices(cfg) if d["enabled"]}
+    selected = line.get("incoming_devices", [])
+    if selected:
+        return [ext for ext in selected if ext in enabled]
+    # Once a device list is configured, "all" means that list, not a dormant legacy phone.
+    if cfg.get("devices"):
+        return [d["extension"] for d in cfg["devices"] if d["enabled"]]
+    return ["100"] if "100" in enabled else []
 
 
 def effective_lines(cfg):
@@ -77,7 +123,7 @@ def incoming_aliases(line):
 def validate_line(raw, previous=None):
     if not isinstance(raw, dict) or set(raw) - LINE_FIELDS:
         raise ValueError("Ungültiges Rufnummernkonto.")
-    cfg = {**{k: DEFAULTS[k] for k in ACCOUNT_FIELDS}, "id": "main", "label": "Rufnummer", "incoming_mode": "normal", **ANNOUNCEMENT_DEFAULTS, **(previous or {}), **raw}
+    cfg = {**{k: DEFAULTS[k] for k in ACCOUNT_FIELDS}, "id": "main", "label": "Rufnummer", "incoming_mode": "normal", "incoming_devices": [], **ANNOUNCEMENT_DEFAULTS, **(previous or {}), **raw}
     if not isinstance(cfg["id"], str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", cfg["id"]):
         raise ValueError("Konto-ID: Kleinbuchstaben, Ziffern, Unterstrich oder Bindestrich, beginnend mit Buchstabe.")
     if not isinstance(cfg["label"], str) or not 1 <= len(cfg["label"].strip()) <= 80:
@@ -131,6 +177,9 @@ def validate_line(raw, previous=None):
     if type(cfg["announcement_auto_answer"]) is not bool or type(cfg["announcement_max_seconds"]) is not int or not 10 <= cfg["announcement_max_seconds"] <= 600:
         raise ValueError("Durchsage: Auto-Answer-Schalter und Dauer zwischen 10 und 600 Sekunden prüfen.")
     validate_account(cfg)
+    targets = cfg["incoming_devices"]
+    if not isinstance(targets, list) or len(targets) > 100 or any(not isinstance(x, str) or not re.fullmatch(r"1[0-9]{2}", x) for x in targets) or len(set(targets)) != len(targets):
+        raise ValueError("Klingelziele müssen eindeutige Geräte-Nebenstellen von 100 bis 199 sein.")
     return cfg
 
 
@@ -235,8 +284,13 @@ def validate(body, previous=None):
     value = body.get("phone_password")
     if value is not None and value != "":
         cfg["phone_password"] = secret_value(value, "SIP-Telefon-Passwort", 12)
-    if cfg["audio_target"] == "sip" or cfg["phone_password"]:
+    cfg["devices"] = validate_devices(cfg.get("devices", []), (previous or {}).get("devices", []))
+    if (cfg["audio_target"] == "sip" and not any(d["enabled"] for d in cfg["devices"])) or cfg["phone_password"]:
         secret_value(cfg["phone_password"], "SIP-Telefon-Passwort", 12)
+    enabled_extensions = {d["extension"] for d in sip_devices(cfg) if d["enabled"]}
+    for line in lines:
+        if set(line["incoming_devices"]) - enabled_extensions:
+            raise ValueError("Klingelziele: nur vorhandene aktive Geräte auswählen. Entfernte Ziele zuerst aus der Rufnummer entfernen.")
     if not isinstance(cfg["web_username"], str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,40}", cfg["web_username"]):
         raise ValueError("Kiosk-Benutzername: nur Buchstaben, Ziffern, Unterstrich und Bindestrich.")
     password = body.get("web_password", "")
@@ -288,7 +342,8 @@ class Settings:
         self.value = cfg
 
     def public(self):
-        return {**{k: v for k, v in self.value.items() if k not in {"auth_password", "phone_password", "web_password_hash", "intercom_key"}},
+        return {**{k: v for k, v in self.value.items() if k not in {"auth_password", "phone_password", "web_password_hash", "intercom_key", "devices"}},
+                "devices": [{**{k: v for k, v in d.items() if k != "password"}, "password_set": bool(d["password"])} for d in self.value.get("devices", [])],
                 "intercom_key_set": bool(self.value.get("intercom_key")),
                 "auth_password_set": bool(self.value["auth_password"]),
                 "phone_password_set": bool(self.value["phone_password"]),
@@ -322,16 +377,21 @@ local_net=127.0.0.1/32
     if cfg["external_address"]:
         pjsip += f"external_signaling_address={cfg['external_address']}\nexternal_media_address={cfg['external_address']}\n"
     pjsip += pjsip[pjsip.index('[transport-udp]'):].replace('[transport-udp]', '[transport-tcp]').replace('protocol=udp', 'protocol=tcp')
-    if cfg["phone_password"]:
+    for device in sip_devices(cfg):
+        if not device["enabled"]:
+            continue
+        extension = device["extension"]
+        auth_id = "phone-auth" if extension == "100" else "device-" + extension + "-auth"
         pjsip += f"""
-[100]
+[{extension}]
 type=endpoint
 transport=transport-udp
 context=from-phone
 disallow=all
 allow=alaw,ulaw
-auth=phone-auth
-aors=100
+auth={auth_id}
+aors={extension}
+callerid={ini(device['name'])} <{extension}>
 direct_media=no
 force_rport=yes
 rtp_symmetric=yes
@@ -339,13 +399,13 @@ rewrite_contact=yes
 deny=0.0.0.0/0
 permit={cfg['local_network']}
 
-[phone-auth]
+[{auth_id}]
 type=auth
 auth_type=userpass
-username=100
-password={ini(cfg['phone_password'])}
+username={extension}
+password={ini(device['password'])}
 
-[100]
+[{extension}]
 type=aor
 max_contacts=1
 remove_existing=yes
@@ -409,6 +469,9 @@ include => from-kiosk-phone
 
 [from-kiosk-phone]
 """
+    # Device extensions are identities; KS already provides internal intercom.
+    # Never send a local device number to the external provider.
+    dial += "exten => _1XX,1,Hangup(1)\n"
     selected = next((line for line in lines if line["id"] == cfg.get("outbound_line", "main") and line["incoming_mode"] == "normal"), None)
     if selected:
         for pattern in ("_X.", "_+X.", "_*X.", "_#X."):
@@ -433,7 +496,8 @@ include => from-kiosk-phone
             if native:
                 dial += f"Ringing()\n same => n,Gosub(kiosk-native,s,1({line['id']},call))\n same => n,Hangup()\n"
             else:
-                dial += "Dial(PJSIP/100,45)\n same => n,Hangup()\n"
+                targets = "&".join("PJSIP/" + extension for extension in incoming_devices(cfg, line))
+                dial += (f"Dial({targets},45)\n same => n,Hangup()\n" if targets else "Hangup(20)\n")
         elif line["incoming_mode"] == "announcement":
             dial += "Set(KIOSK_CALLER=${FILTER(0-9+,${CALLERID(num)})})\n"
             dial += ' same => n,GotoIf($["${CALLERID(num-pres):0:7}" != "allowed"]?denied)\n' 

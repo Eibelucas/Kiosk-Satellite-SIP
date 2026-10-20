@@ -1,15 +1,18 @@
-# Kiosk Satellite SIP Gateway für HAOS
+# Kiosk Satellite SIP Gateway for HAOS
 
-Asterisk und Telefon-Gateway in einem Add-on, mit deutschem Anbieter-Onboarding.
+This add-on includes the Asterisk telephone server and a web interface for configuring SIP providers, phone numbers, and devices. Installation is supported on Home Assistant OS with amd64 architecture.
 
-- amd64, passend für HAOS auf einem unterstützten amd64-System
-- Einrichtung über Home Assistant Ingress
-- Telekom, sipgate, easybell, FRITZ!Box und eigene SIP-Zugangsdaten
-- Mehrere Rufnummern, normale Hauptrufnummer und separate Durchsagen mit Absenderliste/PIN
-- SIP-Nebenstelle 100 und lokaler Echo-Test 600
-- Anrufpad, Telefonkontakte und Kiosk-/Raumkarten mit Suche/Favoriten
-- Optionaler LAN-Zugang mit eigenem Kiosk-Passwort
+- Provider profiles and manual SIP configuration.
+- Up to eight external SIP accounts with separate numbers and call rules.
+- Individual SIP extensions and passwords for multiple kiosks.
+- Ringing targets for each external phone number.
+- Local echo test on extension 600 for registered SIP devices.
+- Optional web phone page with contacts and kiosk cards.
+- Alternative audio bridge to Kiosk Satellite intercom.
+- Dedicated announcement numbers with caller allowlists, an optional PIN, and a duration limit.
 
-**Audio-Ziel wählen:** Ab 26.10.9 ist Kiosk Satellite Intercom mit nativer Anrufanzeige, Mikrofon und Lautsprecher verfügbar. Alternativ SIP-Telefon 100 verwenden. Ein konfigurierter Kiosk, gemeinsamer Intercom-Schlüssel und lokale HTTP/WS-Verbindung; TLS-Intercom ist noch nicht unterstützt. Kiosk-Karten sind die Kontaktanzeige im Anrufpad.
+For the native KS dialer, select **SIP phone / Softphone 100** (**SIP-Telefon / Softphone 100**) as the audio target. Device management defines each device extension and password. Provider registration stays centralized in the add-on.
 
-Alle Schritte und Gegenproben stehen im Tab **Dokumentation** bzw. in [DOCS.md](DOCS.md).
+The alternative **Kiosk Satellite Intercom** bridge connects one configured kiosk through a shared intercom key. It uses local HTTP/WebSocket connections and currently does not support TLS intercom.
+
+[Setup, operating modes, and troubleshooting](DOCS.md)

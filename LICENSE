@@ -173,3 +173,20 @@
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
+
+
+THIRD-PARTY ATTRIBUTION FOR THE NATIVE DIALER LAB
+
+Kiosk Satellite SIP Native Dialer Lab
+
+Includes Apache-2.0 SDK source files from jxlarrea/kiosk-satellite-plugins.
+https://github.com/jxlarrea/kiosk-satellite-plugins
+
+SipMessage.java and SipDigest.java are adapted from meiser79/kiosk-satellite-sip-phone.
+AndroidG711.java is adapted from that project's SipAudio.java, with changed package,
+outgoing SDP, mute, source filtering and media lifecycle.
+https://github.com/meiser79/kiosk-satellite-sip-phone
+Original SIP Phone author: Peter Meiser.
+
+The floating dialer, its model, direct outgoing SIP controller and lab tests were
+added in this experimental branch. Kiosk Satellite itself is not bundled.

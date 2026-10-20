@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import zipfile
+from plugin_contract import validate_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BYTES = 4 * 1024 * 1024
@@ -19,6 +21,7 @@ manifest_path = ROOT / 'kiosk-satellite-plugin.json'
 manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
 if args.version:
     manifest['version'] = args.version
+validate_manifest(manifest)
 manifest_bytes = (json.dumps(manifest, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
 
 sdk_root = Path(os.environ.get('ANDROID_HOME', os.environ.get('ANDROID_SDK_ROOT', str(Path.home() / 'android-sdk'))))
@@ -26,7 +29,7 @@ android_jar = sdk_root / 'platforms' / f"android-{args.android_platform}" / 'and
 if not android_jar.is_file():
     raise SystemExit(f'Missing Android platform: {android_jar}')
 
-build_tools = sorted((sdk_root / 'build-tools').glob('*/d8'))
+build_tools = sorted((sdk_root / 'build-tools').glob('*/d8.bat' if os.name == 'nt' else '*/d8'))
 if not build_tools:
     raise SystemExit('Android d8 was not found. Install Android build-tools.')
 d8 = build_tools[-1]
@@ -52,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix='kiosk-sip-plugin-') as temp_name:
     if not sdk_sources or not plugin_sources:
         raise SystemExit('Missing SDK or plugin Java sources')
 
-    subprocess.run([jtool('javac'), '--release', '8', '-d', str(sdk_classes), *sdk_sources], check=True)
+    subprocess.run([jtool('javac'), '--release', '8', '-cp', str(android_jar), '-d', str(sdk_classes), *sdk_sources], check=True)
     sdk_jar = out / 'kiosk-plugin-sdk-1.jar'
     subprocess.run([jtool('jar'), 'cf', str(sdk_jar), '-C', str(sdk_classes), '.'], check=True)
 
@@ -82,4 +85,6 @@ with tempfile.TemporaryDirectory(prefix='kiosk-sip-plugin-') as temp_name:
 
     # Kiosk Satellite validates the release manifest against the package manifest.
     (out / 'kiosk-satellite-plugin.json').write_bytes(manifest_bytes)
+    digest = hashlib.sha256(package.read_bytes()).hexdigest()
+    (out / (package.name + '.sha256')).write_text(f'{digest}  {package.name}\n', encoding='utf-8', newline='\n')
     print(package)

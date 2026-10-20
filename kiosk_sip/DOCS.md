@@ -1,218 +1,193 @@
-# Einrichtung auf HAOS
+# Setup on Home Assistant OS
 
-Telefonseite ab **26.10.11**: **Telefon öffnen** startet mit den Wähltasten. **Kontakte öffnen** öffnet direkt Kontakte und Favoriten im Plugin. Ein Kontakt trägt die Nummer ein; erst **Anrufen** mit Bestätigung fordert den Anruf an. Die native KS-Gegensprechliste enthält weiterhin Kiosk-Geräte. SDK 1 hat keine Schnittstelle zum Eintragen von SIP-Telefonkontakten; dafür ist eine Änderung an Kiosk Satellite erforderlich.
+The add-on provides an Asterisk telephone server and a web interface for providers, phone numbers, and devices. The Kiosk Satellite plugin registers with this server as a SIP device.
 
-Für HAOS auf einem unterstützten amd64-System (amd64). Kein separates Asterisk-Add-on erforderlich: Dieses Add-on enthält Asterisk und den SIP-Gateway.
+## Requirements and operating modes
 
-## 1. Add-on installieren
+Home Assistant OS on amd64 systems is supported. The native plugin requires Android 7/API 24 or later, microphone permission, and a Kiosk Satellite version with SDK 1 overlays.
 
-1. Home Assistant → Einstellungen → Apps/Add-ons → Store öffnen.
-2. Im Drei-Punkte-Menü **Repositories** wählen.
-3. `https://github.com/Eibelucas/Kiosk-Satellite-SIP` hinzufügen.
-4. **Kiosk Satellite SIP Gateway** öffnen und installieren. Das Image wird lokal gebaut; beim ersten Mal dauert das länger als ein Download.
-5. Starten, **Beim Booten starten** aktivieren und **Weboberfläche öffnen** wählen.
-
-Unter **Konfiguration** ist nur der Port der Kiosk-Telefonseite einstellbar (Standard `8088`). Die Anbieter-Einrichtung erfolgt in der Weboberfläche. Nach Änderung des Ports das Add-on neu starten.
-
-Ab **26.10.6** weist Home Assistant den internen Ingress-Port dynamisch zu. Ein anderer Dienst auf `8099` verhindert die Einrichtung dadurch nicht mehr. Dazu liest das Add-on ausschließlich seine eigenen Informationen über die Supervisor-API mit der Standardrolle; der Supervisor-Token wird nicht angezeigt oder gespeichert.
-
-**Bei einem vorhandenen Startfehler:** Im Add-on-Store nach Updates suchen, das **HA-Add-on auf 26.10.9 aktualisieren** und neu starten. Das Aktualisieren des Kiosk-Plugins allein repariert den HA-Container nicht. Anschließend **Weboberfläche öffnen**. Wenn dort ein belegter SIP-Port gemeldet wird, unter **Heimnetz → SIP-Port** einen freien Port eintragen, z. B. `5072`, und speichern. Am SIP-Telefon denselben Port setzen. Gespeicherte Rufnummern und Zugangsdaten bleiben erhalten; kein Neuinstallieren oder Löschen nötig.
-
-Bei belegtem SIP-/AMI-Port bleibt die HA-Einrichtung erreichbar und zeigt den Fehler. Ein belegter LAN-Webport deaktiviert nur die Kiosk-Webseite: unter **Add-on-Konfiguration → gateway_port** einen freien Port wählen und neu starten. Der tatsächliche SIP-Status steht im Assistenten; ein erreichbares Add-on bedeutet nicht automatisch einen angemeldeten Anschluss.
-
-Falls das Add-on nicht erscheint: Store neu laden und sicherstellen, dass die URL ohne `/tree/…`, `/releases/…` oder Dateipfad eingetragen ist. Die App unterstützt derzeit ausschließlich amd64.
-
-## 2. Anbieter-Onboarding
-
-Wähle deinen Anbieter. Die Profile sind Konfigurationshilfen, keine Bestätigung eines Live-Tests deines Anschlusses.
-
-| Profil | Vorgabe / Zugang |
-| --- | --- |
-| Telekom Privatkunden | `tel.t-online.de`, Anschluss-Anmeldung oder Telefonie-Daten; kein DeutschlandLAN/Regio |
-| sipgate SIP-Gerät | `sipgate.de`, SIP-ID und Geräte-SIP-Passwort; kein trunking-Profil |
-| easybell VoIP | `voip.easybell.de`, SIP-Zugang aus my.easybell; Anmelde-ID standardmäßig `0049…` |
-| FRITZ!Box | Lokales IP-Telefon in der Box anlegen, dort Rufnummern zuweisen; Registrar/Domain `fritz.box` oder Router-IP |
-| Vodafone, 1&1, o2 | Manuelle Profile: aktuelle SIP-Zugangsdaten des Anschlusses einschließlich Registrar/Domain übernehmen |
-| Anderer Anbieter / PBX | Registrierendes SIP-Konto mit benutzerdefinierten Servern |
-
-SIP-Benutzername und Passwort sind vom Web-Login getrennt. Groß-/Kleinschreibung bleibt erhalten; nur Telekom verlangt hier Kleinschreibung. Bei Anbieterwechsel ist ein neues SIP-Passwort nötig. Noch keine TLS/SRTP-Unterstützung und keine reinen IP-authentifizierten Trunks. UDP/TCP betrifft den Anbieter; Telefon 100 verwendet UDP.
-
-Unter **Weitere SIP-Einstellungen** kannst du Client-User (Anmelde-ID), Contact-User (eingehende Ziel-ID), From-User, Realm, Proxy und STUN anpassen. Server als Hostname/IP, optional mit Port, niemals als `https://…` oder komplette SIP-URI eingeben. Bei Vodafone hängen diese Daten vom Anschluss/Netz ab.
-
-Für Telekom gilt folgende Einordnung:
-
-| Feld | Was du einträgst |
-| --- | --- |
-| Festnetznummer | Die eigene vollständige Rufnummer mit Landesvorwahl, ohne Leerzeichen |
-| Telekom-Anmeldung | Zunächst Anschluss-Authentifizierung ohne Passwort, falls für deinen Zugang verfügbar; andernfalls Passwort-Anmeldung |
-| Authentifizierungsname | Bei Passwort-Anmeldung: der gültige Telekom-Authentifizierungsname, in Kleinschreibung |
-| Telekom-Passwort | Das zu diesem Zugang gehörende Telefonie-Passwort gemäß Telekom-Hilfe; nicht ungeprüft das separate E-Mail-Programm-Passwort |
-| NAS-IP | Die eigene lokale IPv4-Adresse des HAOS-Systems; im Router dauerhaft zuordnen |
-| Heimnetz | Das eigene IPv4-Heimnetz in CIDR-Schreibweise |
-| SIP-Port | Standard `5070`; am SIP-Telefon denselben Port verwenden |
-| Externe Adresse | Optional deine aktuelle öffentliche IPv4-Adresse, wenn die RTP/NAT-Konfiguration sie benötigt |
-| Passwort für Telefon 100 | Ein eigenes, langes Passwort für das SIP-Telefon/Softphone |
-| LAN-Zugriff | Aktivieren, damit der Kiosk die Telefonseite erreichen kann |
-| Kiosk-Benutzer/Passwort | Eigener Zugang für die Web-Telefonseite; keine Telekom-Daten verwenden |
-
-Der Assistent setzt Registrar, SIP-Domäne und Proxy-Ziel auf `tel.t-online.de`. Es wird kein bestimmter Telekom-Server als feste IP eingebaut; die SIP-Zielauflösung erfolgt per DNS. Bei Anschluss-Authentifizierung wird kein Passwort-Digest konfiguriert. Wird die Registrierung abgelehnt, gültige Telekom-Zugangsdaten verwenden und neu speichern.
-
-**Speichern** schreibt die Konfiguration und startet Asterisk neu. Damit werden laufende Gespräche unterbrochen. Passwörter bleiben bei späterem Speichern erhalten, wenn ihre Eingabefelder leer bleiben; die Anschluss-Authentifizierung löscht ein vorher gespeichertes Telekom-Passwort. Die Oberfläche gibt gespeicherte Passwörter nicht zurück.
-
-**Danach das Add-on einmal neu starten**, wenn LAN-Zugriff oder NAS-Adresse geändert wurden. Der LAN-Webserver bindet beim Start an die eingetragene NAS-IP. Asterisk bindet den SIP-Port ebenfalls an diese IP.
-
-## Mehrere Rufnummern und Hauptrufnummer
-
-Unter **Rufnummer hinzufügen** legst du bis zu acht einzelne SIP-Konten an. Telekom: höchstens fünf aktive Konten, wobei andere SIP-Clients am Anschluss mitzählen. Jede Rufnummer hat einen Namen, eine eigene Anbieter-Konfiguration und einen Status. Gespeicherte Konten werden intern an ihrer Konto-ID erkannt; Umsortieren ändert ihre Passwörter nicht.
-
-- **Normal auf Telefon 100 klingeln**: normale eingehende Gespräche, ohne Auto-Answer.
-- **Abweisen**: Konto darf registriert bleiben, eingehende Anrufe werden abgewiesen. Geeignet zum Vorbereiten einer zweiten Nummer.
-- **Dieses Konto registrieren** aus: keine Anmeldung beim Anbieter.
-- **Standardrufnummer für ausgehende Anrufe**: deine normale Hauptrufnummer. Alternativ keine ausgehenden Anrufe. Das Anrufpad kann eine andere aktive normale Nummer auswählen.
-
-Deine bestehenden Telekom-Daten werden als **Hauptrufnummer** übernommen. Alte `/data/telekom.json` bleibt der Speicherort; keine Passwörter ins Git-Repository kopieren. Bei Wechsel des SIP-Benutzers, Registrars oder der Anmelde-ID ist ein neues SIP-Passwort nötig.
-
-Für die eingehende Zuordnung nutzt Asterisk die konkrete Ziel-ID: internationale Nummer, nationale deutsche Schreibweise und die konfigurierte Client-/Contact-ID. Konten auf demselben Registrar müssen eindeutige Ziel-IDs haben. Unbekannte Ziele werden abgewiesen und können keine externen Nummern wählen. Ein gemeinsamer SIP-Trunk mit einer Registrierung für mehrere Durchwahlen ist derzeit kein fertiges Trunk-Profil; lege separate SIP-Geräte/Konten an, soweit dein Anbieter dies unterstützt.
-
-Bei einer FRITZ!Box für jede Rolle ein eigenes IP-Telefon anlegen und in der Box **nur die zugehörige eingehende Nummer** zuweisen. Sonst kann die Box schon vor dem Add-on mehrere Nummern auf denselben SIP-Benutzer zusammenführen.
-
-## Eigene Rufnummer für Durchsagen
-
-So richtest du das gewünschte Beispiel ein, ohne die Hauptnummer umzuwidmen:
-
-| Konto | Rolle | Beispiel |
+| Mode | Controls | Audio connection |
 | --- | --- | --- |
-| Hauptrufnummer | Normal auf Telefon 100 klingeln | `<HAUPTRUFNUMMER>` |
-| Separate zweite Nummer | Durchsage von erlaubten Nummern | `<DURCHSAGE-RUFNUMMER>` |
-| Erlaubter Absender für die zweite Nummer | Eigene vollständige Anrufernummer | `<ERLAUBTE-ANRUFERNUMMER>` |
-| Standard ausgehend | Hauptrufnummer | Normale Gespräche verwenden die erste Nummer |
+| Native dialer | Phone button and call view in the KS plugin | SIP/RTP between Android and Asterisk |
+| Web phone with a SIP phone | Browser keypad and contacts | The registered SIP phone is called first |
+| Web phone with KS intercom | Browser keypad and contacts | Intercom bridge to one configured kiosk |
 
-1. Deine Hauptnummer als normales Konto lassen.
-2. Zweites SIP-Konto hinzufügen, dessen eigene Rufnummer und eigene passende Zugangsdaten eintragen.
-3. Bei **Eingehende Anrufe** die Rolle **Durchsage von erlaubten Nummern** wählen.
-4. Die tatsächlichen erlaubten Absender international mit `+` eintragen, eine pro Zeile. Kein Platzhalter, keine anonyme Nummer. Die nationale deutsche und `0049…`-Schreibweise werden im eingehenden Anruf ebenfalls berücksichtigt.
-5. Optional eine **PIN mit sechs Ziffern** setzen. Eine angezeigte Absendernummer kann gefälscht sein: Die Nummernliste ist keine sichere Authentifizierung. Die PIN ergänzt sie. Zum Entfernen ausdrücklich **Gespeicherte PIN entfernen** wählen; ein leeres Feld behält sie.
-6. **Auto-Answer auf Telefon/Lautsprecher 100 anfordern** bei Bedarf aktivieren. Am SIP-Gerät Auto-Answer **nur bei passenden SIP-Headern** konfigurieren, nicht pauschal bei jedem Anruf. Unterstützt werden `Call-Info: …;answer-after=0` und `Alert-Info: …;info=alert-autoanswer`; die konkrete Geräteunterstützung prüfen.
-7. Maximale Dauer setzen (10 bis 600 Sekunden, Standard 180), speichern und Status beider Nummern prüfen.
-8. Von der erlaubten Nummer die **zweite Nummer** anrufen. Bei PIN: Nach Verbindungsaufbau innerhalb von 15 Sekunden die sechs Ziffern eingeben, eventuell mit `#` abschließen. Es gibt kein gesprochenes PIN-Menü. Danach sprechen.
-9. Gegenprobe von einer fremden Nummer und mit unterdrückter Rufnummer: Der Anruf muss abgewiesen werden. Die Hauptnummer weiterhin separat auf normales Klingeln testen.
+The steps below configure the native dialer. The two web modes are described under [Web phone and intercom bridge](#web-phone-and-intercom-bridge).
 
-Bei SIP-Audio nutzt die Durchsage Asterisk Page mit stummem Zielmikrofon auf Telefon/Lautsprecher 100. Ohne unterstütztes Header-Auto-Answer muss dieses Ziel angenommen werden. Bei Kiosk-Audio nutzt sie den nativen Intercom-Durchsage-Modus: Kiosk Satellite spielt den Hinweis und die Stimme über seinen Lautsprecher ab; sein Mikrofon wird nicht zurück an den Absender gesendet. Durchsagen müssen am Kiosk erlaubt sein. Nicht stören und besetzte Kiosks werden respektiert.
+The setup assistant currently uses German labels. Exact labels are included in parentheses where needed.
 
-Besetzte Ziele werden übersprungen; Anrufe werden nicht erzwungen unterbrochen. Jeweils eine Durchsage läuft; weitere werden abgewiesen. Der Raum endet beim Auflegen des Absenders oder beim Dauerlimit. Es gibt keine Aufzeichnung und keine externe Weiterleitung an die erlaubten Absendernummern.
+## 1. Install the add-on
 
-Die Einstellungen hier ändern nicht die Nummernzuordnung im Router oder beim Anbieter. Bestehende Haustelefone dort behalten ihre bisherigen Zuordnungen; bei Bedarf die zweite Nummer dort von normalem Klingeln ausnehmen. Bei der FRITZ!Box pro Rolle ein eigenes IP-Telefonkonto und nur die zugehörige Nummer zuweisen.
+1. Open **Settings → Apps/Add-ons → Store** in Home Assistant.
+2. Select **Repositories** from the menu and add `https://github.com/Eibelucas/Kiosk-Satellite-SIP`.
+3. Install and start **Kiosk Satellite SIP Gateway**. The image is built on the HAOS system.
+4. Select **Open Web UI**. Home Assistant ingress provides access to the setup assistant.
 
-## 3. SIP-Telefon anmelden und Audio testen
+The add-on configuration includes `gateway_port`, the port of the optional LAN web phone page; its default is **8088**. Provider accounts, the SIP port, and devices are managed in the setup assistant. Home Assistant assigns the ingress port.
 
-Das Kiosk-Plugin öffnet die Telefonseite. Die Audio-Verbindung ist separat im HA-Add-on wählbar: natives Kiosk Satellite Intercom oder ein SIP-Telefon. Die folgenden Telefon-100-Schritte gelten nur für SIP-Audio.
+## 2. Configure a provider and phone number
 
-| Telefon-Einstellung | Wert |
+In the connection step (**Anschluss**), choose a provider profile and enter the phone number in international format, including `+` and the country code. Registration uses the credentials associated with the SIP account.
+
+| Profile | Configuration |
 | --- | --- |
-| Server/Domain/Registrar | Die eigene lokale IPv4-Adresse des HAOS-Systems |
-| Port | `5070` oder dein eingestellter SIP-Port |
-| Transport | UDP |
-| Benutzername | `100` |
-| Authentifizierungs-ID | `100` |
-| Passwort | Dein im Assistenten gesetztes Passwort für Telefon 100 |
-| Codecs | G.711 A-law oder µ-law (PCMA/PCMU) |
+| Telekom residential | MagentaZuhause profile with `tel.t-online.de`; access-based or password authentication |
+| sipgate | Device SIP ID and password; registrar `sipgate.de` |
+| easybell | SIP account credentials; registrar `voip.easybell.de`; default registration number format `0049…` |
+| FRITZ!Box | An IP phone configured in the PBX with assigned phone numbers |
+| Vodafone, 1&1, o2 | SIP servers and credentials specified by the provider |
+| Other SIP provider / custom PBX | Manual registration with registrar, domain, and SIP account |
 
-1. Registrierung einschalten. In der HA-Weboberfläche auf **Aktualisieren** drücken. Telefon 100 muss angemeldet sein.
-2. Auf dem SIP-Telefon **600** wählen. Dieser lokale Echo-Test ruft niemanden extern an. Wenn du dich selbst hörst, ist der lokale Audio-Pfad vorhanden.
-3. Status der gewünschten Rufnummer prüfen: **registriert**. **wartet** ist kein Erfolgsnachweis; Registrierung kann einige Sekunden dauern.
+Profiles supply defaults for supported account types. Availability for a particular connection and any contract- or server-specific requirements must be checked against the provider's configuration.
 
-Nur ein SIP-Gerät gleichzeitig auf Nebenstelle 100 verwenden. Ein neu angemeldetes Gerät ersetzt die bisherige Registrierung.
+Advanced SIP settings (**Weitere SIP-Einstellungen**) include client user, incoming destination ID, caller ID user, realm, proxy, transport, and STUN. Server fields take hostnames or IPv4 addresses; some also accept a port. Provider connections support UDP and TCP.
 
-### Kiosk Satellite als Audio-Ziel ab 26.10.9
+### Multiple external numbers
 
-1. **Das HA-Add-on auf 26.10.9 aktualisieren**, neu starten und die Weboberfläche öffnen. Ein Plugin-Update allein installiert die Audio-Brücke nicht.
-2. Am Android-Kiosk in **Einstellungen → Intercom** Intercom aktivieren und die Mikrofonberechtigung erlauben. Den gemeinsamen Intercom-Schlüssel anzeigen/kopieren. **Talk mode → Hands free** liefert Gegensprechen ohne gedrückte Sprechtaste; Push-to-talk funktioniert mit der Sprechtaste. Nicht stören verhindert Anrufe.
-3. Im HA-Assistenten **Telefon → Audio-Ziel → Kiosk Satellite Intercom** auswählen. Die eigene lokale Kiosk-IP und den Identitätsport eintragen. Meist ist dies der Remote-Admin-Port **2324**. Der separate, dynamische Intercom-Listener-Port wird aus der Identitätsantwort übernommen. Alternativ ist sein aktueller Port direkt verwendbar. Keine IP/Rufnummer aus Anleitungen übernehmen.
-4. Den gleichen **Intercom-Schlüssel** eintragen. Er bleibt lokal in der Add-on-Konfiguration mit eingeschränkten Dateirechten und wird nicht vom Status-/Setup-API zurückgegeben. Leer lassen behält ihn bei unveränderter Kiosk-IP. Bei Wechsel des Kiosks erneut eintragen.
-5. Einen freien **Kiosk-Rückrufport** wählen, Standard **8090**. Der Kiosk muss die eigene HAOS-IP auf diesem TCP-Port erreichen können. Nur Meldungen der eingetragenen Kiosk-IP mit gültigem Einmal-Token für den aktiven Anruf werden angenommen. AudioSocket und FastAGI binden ausschließlich Loopback an dynamische Ports. Keine Router-Portfreigabe einrichten.
-6. **Speichern und Asterisk starten**, anschließend **Kiosk-Verbindung prüfen**. Bei Änderung der LAN-Webadresse zusätzlich das Add-on neu starten. Es wird beim Speichern kein Anruf gestartet.
-7. **Lokalen Kiosk-Echo-Test starten** drücken. Am Kiosk erscheint ein Anruf. **Annehmen**, sprechen und sich selbst hören; am Kiosk auflegen. Der Test wählt ausschließlich die lokale Asterisk-Echo-Nebenstelle 600, keine externe Nummer. Die Diagnose zeigt gesendete und empfangene Audio-Frames.
-8. Erst danach eine eigene Testnummer im Anrufpad eingeben und **Anrufen** bestätigen. Der Kiosk klingelt zuerst. Erst nach dem Annehmen wird die externe Zielnummer gewählt. Ein normaler eingehender Anruf klingelt entsprechend am Kiosk.
-9. Für separate Durchsagen am Kiosk **Accept announcements** erlauben. Die bisherige Absenderliste/PIN und das Dauerlimit bleiben aktiv. Ein erlaubter Durchsage-Anruf verwendet den einseitigen Intercom-Modus; das Kiosk-Mikrofon wird verworfen. Mit fremder/unterdrückter Absendernummer und mit Nicht stören gegenprüfen.
+Use **Add number** (**Rufnummer hinzufügen**) to configure up to eight separate SIP accounts. Each number has its own provider configuration and incoming call rule:
 
-**Umfang und Grenzen:** Ein konfiguriertes Kiosk-Gerät, 16-kHz-PCM-Audio über den nativen Intercom-WebSocket. Kiosk Satellite kümmert sich um Mikrofon, Lautsprecher, seine Anrufanzeige und Echo-Unterdrückung. Die Brücke verwendet derzeit lokale HTTP/WS-Verbindungen. Wenn der Kiosk verschlüsseltes Intercom verlangt, wird die Verbindung mit Hinweis abgewiesen; die Einstellung wird nicht verändert. TLS-Intercom, mehrere Audio-Kiosks pro Anruf und externe Internet-Nutzung sind nicht enthalten. Ein echtes Android-Gerät, Mikrofonberechtigungen, Talk mode und Router-NAT sind nach dem automatisierten Echo-Test noch vor Ort zu prüfen.
+- **Normal ringing** (**Normal am gewählten Audio-Ziel klingeln**): an incoming call.
+- **Reject** (**Abweisen**): registration can stay enabled while incoming calls are rejected.
+- **Announcements from allowed numbers** (**Durchsage von erlaubten Nummern**): a dedicated announcement number with access rules.
 
-Bei **Kiosk nicht erreichbar** die IP und den Identitätsport prüfen. Bei **anderer Schlüssel** den Intercom-Schlüssel beider Seiten vergleichen. Bei Klingeln ohne Audio den HAOS-Rückrufport, Mikrofonberechtigung, Talk mode und Audio-Frame-Zähler prüfen. Beim Auflegen muss die Anrufanzeige schließen. Der SIP-Telefon-Modus 100 bleibt wählbar; ein Update stellt bestehende Installationen nicht automatisch auf Kiosk-Audio um.
+**Register this account** (**Dieses Konto registrieren**) enables provider registration. The default outgoing number (**Standardrufnummer für ausgehende Anrufe**) selects the account used by the native dialer. **No outgoing calls** (**Keine ausgehenden Anrufe**) disables its external route.
 
-## 4. Kiosk verbinden
+Accounts on the same registrar need unique incoming destination IDs. Local PBXs also assign incoming and outgoing numbers in their own configuration. The provider and connection determine how many simultaneous calls are available.
 
-1. Im Kiosk Satellite Plugin-Manager das Plugin **Kiosk Satellite SIP** öffnen.
-2. **Gateway URL** auf `http://NAS-IP:8088/` setzen. Bei geändertem Gateway-Port diesen verwenden.
-3. **Telefon öffnen** ausführen.
-4. Mit dem Kiosk-Benutzernamen und Kiosk-Passwort anmelden.
-5. Kontakte im HA-Assistenten unter **Telefon → Kontakte und Kiosk-Karten** hinzufügen, oder direkt die Wähltasten verwenden.
+## 3. Configure the local network
 
-Die Home-Assistant-Ingress-URL gehört nicht in die Plugin-Einstellung. Verwende die normale LAN-URL inklusive abschließendem `/`.
-
-## 5. Erster externer Anruf
-
-1. Eine eigene Testnummer auswählen/eingeben.
-2. **Anrufen** drücken und die Rückruf-Anfrage bestätigen.
-3. Das gewählte Audio-Ziel klingelt zuerst: bei **Kiosk Satellite Intercom** der konfigurierte Kiosk, bei **SIP-Telefon 100** das angemeldete SIP-Telefon.
-4. Dort annehmen. Erst danach wählt Asterisk die externe Zielnummer über die ausgewählte normale Anbieter-Rufnummer. Kiosk-Audio benötigt keine Anmeldung von Telefon 100.
-5. Zum Beenden am Kiosk bzw. SIP-Telefon auflegen.
-
-Die Weboberfläche meldet die Annahme einer Rückruf-Anfrage, nicht das erfolgreiche Zustandekommen des externen Gesprächs. Der Bestätigungsdialog ist ein nativer Browser-/WebView-Dialog mit **OK** und **Abbrechen**. Abbrechen startet keine Anfrage; OK fordert zunächst den Rückruf auf das gewählte Audio-Ziel an. Solange der Dialog offen ist, wird keine Anruf-Anfrage gesendet. Die Anzeige auf dem eigenen Android-Kiosk muss vor Ort geprüft werden. DTMF-Tasten während eines Gesprächs und ein Auflegen-Button im Gateway sind derzeit nicht enthalten.
-
-**Lokaler Test:** Für Kiosk-Audio ausschließlich **Lokalen Kiosk-Echo-Test starten** im HA-Assistenten verwenden. Dieser eigene API-Pfad wählt 600 im lokalen Echo-Kontext. **600 in das normale Anrufpad einzugeben ist kein lokaler Echo-Test:** `api/call` verwendet den Anbieter-Kontext und kann die Nummer über den Anbieter wählen. Der erste echte Telefon-Test sollte bewusst eine eigene, freigegebene Zielnummer verwenden.
-
-Normale eingehende Anbieter-Anrufe klingeln am gewählten Audio-Ziel. Voraussetzung: Anbieter-Registrierung, korrekte Zuordnung der eingehenden Rufnummer und funktionierende Netzwerk-/Audio-Verbindung. Separate Durchsage-Rufnummern behalten ihre Absenderliste/PIN und das Dauerlimit. Es werden keine automatischen Testanrufe ausgelöst.
-
-## Fehler beheben
-
-| Symptom | Nächster Schritt |
+| Field | Meaning |
 | --- | --- |
-| Asterisk startet nicht | Add-on-Protokoll lesen. NAS-IP muss auf HAOS tatsächlich vorhanden und SIP-Port frei sein. |
-| `Address in use` auf `8099` / Ingress-Traceback | HA-Add-on auf 26.10.9 aktualisieren und neu starten; Ingress verwendet den von HA zugewiesenen Port. |
-| `transport-udp`: `Address in use` | HA-Weboberfläche → Heimnetz → SIP-Port auf einen freien Port ändern und speichern; Telefon 100 auf denselben Port ändern. |
-| AMI-Port `5038` belegt | Anderen lokalen Asterisk-/AMI-Dienst prüfen. Beide Dienste dürfen denselben Loopback-Port nicht gleichzeitig verwenden. |
-| Telekom: abgelehnt | Rufnummer/Anschlusstyp prüfen, ggf. zur Passwort-Anmeldung wechseln. Authentifizierungsname und Rufnummer sind unterschiedliche Felder. |
-| Telekom: wartet | DNS, Internetzugang und SIP-Verkehr am Router prüfen. Beim Verbindungsaufbau kurz warten, dann Status aktualisieren. |
-| Private NAS-IP wird beim Speichern abgelehnt | Unter Heimnetz mit Netzmaske das tatsächliche lokale Netz eintragen. Eine private IP allein genügt nicht: Sie muss in diesem Netz liegen. Die Netzmaske in HA oder am Router prüfen; /24 entspricht 255.255.255.0. |
-| Telefon 100 fehlt | NAS-IP, Port, UDP, Benutzer `100` und dessen eigenes Passwort prüfen. Beide Geräte müssen im angegebenen Heimnetz liegen. |
-| Anrufen-Taste deaktiviert | Die ausgewählte ausgehende Rufnummer muss aktiviert, normal und beim Anbieter registriert sein. Unter Telefon das gewünschte Audio-Ziel prüfen: Kiosk Satellite Intercom braucht eine gestartete Audio-Brücke; SIP-Telefon 100 braucht ein angemeldetes SIP-Telefon. Für Kiosk-Audio ist Telefon 100 nicht erforderlich. Bei leerer Zielnummer wird keine Anfrage ausgelöst. |
-| Echo-Test ohne Ton | Zuerst WLAN-Isolation, lokale Firewall und UDP/RTP prüfen; Telekom ist am lokalen Echo-Test nicht beteiligt. |
-| Lokaler Ton funktioniert, extern kein/einseitiger Ton | NAT prüfen. Asterisk verwendet UDP `30000–30100` für RTP; Heimnetz und ggf. öffentliche IPv4 korrekt setzen. STUN ist ein Hilfsmittel, kein Ersatz für passende NAT-Regeln. |
-| Kiosk-Seite unerreichbar | LAN-Zugriff aktivieren, Kiosk-Passwort setzen, Add-on neu starten, NAS-IP/Port prüfen. |
-| Anmeldung nach Passwortänderung verloren | Erneut mit dem neuen Kiosk-Zugang anmelden. Bestehende Sitzungen werden ungültig. |
-| Neue Konfiguration beendet ein Gespräch | Speichern startet Asterisk neu. Änderungen außerhalb laufender Gespräche durchführen. |
+| HAOS IPv4 address (**IPv4-Adresse des HAOS-Systems**) | Local address of the system running the add-on |
+| Local network and mask (**Heimnetz mit Netzmaske**) | Actual IPv4 network in CIDR notation |
+| SIP port (**SIP-Port**) | Local Asterisk signaling port; default 5070 |
+| Public IPv4 address (**Öffentliche IPv4-Adresse**) | Optional external address for the applicable NAT configuration |
 
-Keine pauschalen Portfreigaben anlegen. AMI `5038` bindet ausschließlich an Loopback; die Telefon-Weboberfläche ist nur für dein Heimnetz gedacht. Die Telekom-Hilfe beschreibt die je nach Router/Firewall erforderlichen SIP/RTP-Verbindungen. Dieses Add-on kann Routerregeln, SIP-ALG, CGNAT oder DS-Lite nicht automatisch reparieren. Bei wechselnder öffentlicher IPv4 eine manuell eingetragene externe Adresse aktualisieren und neu speichern.
+The HAOS address and devices must be within the configured local network. The prefix follows the network configuration; `/24` corresponds to `255.255.255.0`. A fixed DHCP assignment helps keep the device connection stable.
 
-## Daten und Backups
+The plugin's SIP port must match the assistant. Asterisk uses UDP ports **30000–30100** for RTP audio. The native plugin's default local SIP port is **5090**.
 
-Anschlusskonfiguration, Kontakte, Sitzungsschlüssel und AMI-Schlüssel liegen im persistenten Add-on-Verzeichnis `/data`. SIP-Passwörter müssen Asterisk lokal im Klartext zur Verfügung stehen. Das Kiosk-Webpasswort wird als Hash gespeichert. Diese Daten sind nicht Teil des GitHub-Repositories, gehören aber zu Add-on-Backups; behandle solche Backups entsprechend vertraulich.
+## 4. Configure SIP devices
 
-## Offizielle Quellen
+A SIP extension is a local device identity on the Asterisk server.
 
-- [Telekom: SIP-Client-Einstellungen](https://www.telekom.de/hilfe/internet-telefonie/telefonie/voice-over-ip-sip-client)
-- [Home Assistant: App-/Add-on-Repositories](https://developers.home-assistant.io/docs/apps/repository/)
-- [Home Assistant: Ingress und Präsentation](https://developers.home-assistant.io/docs/apps/presentation/)
-- [Home Assistant: Dynamischer Ingress-Port bei Host-Netzwerk](https://developers.home-assistant.io/docs/apps/configuration/)
-- [Home Assistant: Supervisor-API / App-Informationen](https://developers.home-assistant.io/docs/api/supervisor/endpoints/)
-- [Asterisk: Outbound Registrations](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-Outbound-Registrations/)
-- [Asterisk: NAT-Konfiguration](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-res_pjsip-to-work-through-NAT/)
+For the native dialer, open the phone step and set the audio target to **SIP phone / Softphone 100** (**Telefon → Audio-Ziel → SIP-Telefon / Softphone 100**).
 
-Stand: 6. Oktober 2026. Der Build wird in CI geprüft. Eine echte Telekom-Registrierung und Gespräche müssen mit deinen lokalen Anschlussdaten getestet werden.
+Extension **100** is available for a single device. Set its password under **Neues Passwort für SIP-Telefon 100**. For additional kiosks, use **Mehrere native Kiosks / SIP-Geräte → Gerät hinzufügen** and assign a name, an extension from **101–199**, and a password. Device passwords require at least twelve characters.
 
-### Quellen für weitere Anbieter
+Each extension belongs to one device. A new registration on the same extension replaces the previous registration. Separate extensions allow multiple kiosks to stay registered independently.
 
-- [sipgate SIP-Geräte](https://help.sipgate.de/cloud-telefonanlage/erste-schritte/alles-fur-den-start-mit-sipgate/wie-konfiguriere-ich-mein-voip-telefon-mit-sipgate)
-- [easybell Asterisk/PJSIP](https://www.easybell.de/hilfe/telefon-konfiguration/ip-telefonanlagen-fuer-unsere-sip-trunks/antwort/asterisk-telefonanlagen/)
-- [FRITZ!Box IP-Telefon](https://fritz.com/apps/knowledge-base/FRITZ-Box-7412/42_IP-Telefon-an-FRITZ-Box-anmelden-und-einrichten/)
-- [Vodafone DSL-Zugangsdaten](https://www.vodafone.de/downloadarea/EGF_Kundenanleitung_DSL_Webanleitung_140126_DVW_26.pdf)
+Ringing targets can be restricted under **Klingelnde SIP-Geräte für diese Rufnummer**. With no selection, enabled devices in the device list ring; a single-device configuration uses phone 100. Answering on one device stops ringing on the others.
 
-## Kontakte als Kiosks anzeigen
+### Credentials at a glance
 
-1. Im HA-Assistenten unter **Telefon** den Bereich **Kontakte und Kiosk-Karten** öffnen.
-2. **Kontakt hinzufügen** wählen. Anzeigename und erreichbare Telefonnummer eintragen.
-3. Für eine Raumkarte den Typ **Kiosk / Raumkarte** wählen; optional Raum und Favorit setzen.
-4. Speichern. Auf der Telefonseite erscheinen die Karten unter **Kontakte**; **Kiosks** filtert nur Kiosk-Karten. Die Suche findet Namen, Räume und Nummern.
-5. Eine Karte auswählen. Sie setzt die Zielnummer im Anrufpad. Erst **Anrufen** und die Rückruf-Bestätigung starten den Anruf.
+| Credentials | Purpose | Configuration |
+| --- | --- | --- |
+| Provider SIP account | Register external phone numbers | Connection step in the HA assistant |
+| Device extension and password | Register a kiosk or SIP phone with local Asterisk | Phone step and the corresponding device |
+| Web username and password | Access the optional LAN web phone page | Phone step, LAN access section |
+| Intercom key | Connect the alternative KS intercom bridge | KS intercom and the phone step |
 
-Es werden keine nativen Kiosk-Satellite-Intercom-Peers angelegt. Online-Status oder Präsenz werden nicht vorgetäuscht. Kiosk-Karten verwenden die von dir zugeordnete Telefonnummer und den Rückruf auf das gewählte Audio-Ziel. Es werden keine zusätzlichen internen Kiosk-Nebenstellen angelegt. Normale Telefonkontakte aus älteren Versionen bleiben erhalten.
+## 5. Save and connect the plugin
+
+1. In the final connection step (**Verbinden**), review the summary and default outgoing number.
+2. Select **Save and start Asterisk** (**Speichern und Asterisk starten**). This interrupts active calls.
+3. Install or update **Kiosk Satellite SIP** in the KS plugin manager and enable it.
+4. Enter the HAOS address, SIP port, device extension, and its password in the plugin.
+
+The status **Bereit · Nebenstelle …** confirms plugin registration. **Verbindung prüfen** in the HA assistant also shows Asterisk and provider account status.
+
+When editing unchanged accounts or devices later, leaving password fields blank preserves their stored values. The setup interface does not return provider or device passwords. Changes to the LAN web address or gateway port also require an add-on restart.
+
+## 6. Test audio and calls
+
+1. Dial **600 in the native dialer**. This uses Asterisk's local echo context and plays captured speech back to the device.
+2. Check mute and hangup.
+3. The provider number must appear as registered (**registriert**) in the assistant.
+4. Enter an external number approved for the test and select **Call** (**Anrufen**). The remote party is called directly.
+5. Call the configured external number from another phone and answer at the kiosk.
+
+Incoming calls require manual acceptance. Collapsing the panel keeps a call active; **Hang up** (**Auflegen**) ends it. Internal kiosk calls remain available through KS intercom.
+
+Native SIP calls require the microphone to be free from Voice Satellite or other recording. Shared microphone coordination is not implemented; detected active voice and intercom sessions block a new call.
+
+## Web phone and intercom bridge
+
+The optional web phone page includes a keypad, contacts, favorites, and kiosk cards. It is available through Home Assistant ingress or, after enabling LAN access, at `http://<HAOS-IP>:<GATEWAY-PORT>/`. LAN access uses the configured web username and password.
+
+For outgoing web calls, select a destination and provider account. After confirmation, Asterisk calls the configured local audio target first. Once that target answers, it dials the external number. The web status confirms that the callback was requested; call setup continues at the audio target.
+
+The web page can use a registered SIP phone or the **Kiosk Satellite Intercom** bridge. To configure the bridge:
+
+1. Enable intercom and microphone permission in KS. Select hands-free mode for speakerphone use.
+2. Select **Kiosk Satellite Intercom** as the audio target in the HA assistant.
+3. Enter the local kiosk address, identity port, and shared intercom key. The identity port is usually **2324**; the intercom listener is discovered from the device identity.
+4. Set an available callback port on HAOS; the default is **8090**. The kiosk must be able to reach it.
+5. Save, run **Check kiosk connection** (**Kiosk-Verbindung prüfen**), then **Start local kiosk echo test** (**Lokalen Kiosk-Echo-Test starten**). Accept the test call at the kiosk and check audio and hangup.
+
+The bridge supports one configured kiosk and local HTTP/WebSocket connections. Encrypted KS intercom is not currently supported. SIP devices and the intercom bridge are separate audio targets.
+
+**Echo testing in web mode:** The diagnostic button in the HA assistant explicitly uses the local echo context. The web keypad uses the provider context, so entering 600 there is not a local echo test.
+
+### Contacts and kiosk cards
+
+The contacts section (**Telefon → Kontakte und Kiosk-Karten**) manages names, phone numbers, rooms, and favorites. The **Kiosk / Raumkarte** type controls display on the web phone page. Selecting a card prepares the destination; the call action and confirmation request the call.
+
+These entries belong to the web phone page. Native KS intercom manages its own devices. Contact synchronization into the native SIP dialer is not implemented.
+
+## Dedicated announcement number
+
+A number configured for **Announcements from allowed numbers** uses its own caller allowlist, optional PIN, and duration limit. Other numbers retain their own call rules.
+
+1. Add a separate provider account or phone number.
+2. Select **Durchsage von erlaubten Nummern**.
+3. Enter allowed callers in international format, one per line.
+4. Optionally set a six-digit PIN. It must be entered within 15 seconds after connection. Caller ID can be spoofed; the PIN adds an access check.
+5. Set a duration limit from 10 to 600 seconds; the default is 180.
+6. Test with both an allowed and a disallowed caller.
+
+SIP announcements use phone 100 as the target. Automatic answer through SIP headers requires a suitably configured target device. Intercom announcements use KS's one-way announcement mode. The target microphone does not send audio back.
+
+Busy targets are skipped, and additional simultaneous announcements are rejected. An announcement ends at hangup or the duration limit. These settings do not change number assignments in a router or provider account.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Add-on missing from the store | Check the repository URL and amd64 architecture, then reload the store. |
+| Asterisk does not start | Check add-on logs, the local HAOS address, and occupied SIP/AMI ports. |
+| Plugin reports SIP not registered | Compare the HAOS address, SIP port, enabled device extension, and its password. |
+| Registration switches between devices | Use a separate extension for each device and check for duplicate plugin instances. |
+| SIP 404 on an external call | Check the default outgoing number and route, then the destination and provider response. |
+| Provider account does not register | Check the profile, registrar, credentials, DNS, and SIP service connectivity. |
+| No audio in the local echo test | Check microphone permission, active recording, output routing, Wi-Fi isolation, and RTP traffic. |
+| One-way audio | Check the local network, public address, and RTP NAT configuration. |
+| High voice delay | Compare the local echo test with an external call; check output routing, network load, and packet loss. |
+| Web phone page unavailable | Check LAN access, gateway port, and web credentials; restart after address changes. |
+| Intercom kiosk unavailable | Check the kiosk address, identity port, intercom key, and callback port. |
+| Saving ends a call | Saving restarts Asterisk; make configuration changes outside active calls. |
+
+The web phone page is intended for the local network. AMI binds to loopback. Router NAT, SIP ALG, CGNAT, and DS-Lite can affect external audio; configuration depends on the connection and network.
+
+## Data, updates, and backups
+
+Configuration, contacts, and session keys are stored in the persistent add-on directory `/data`. SIP passwords are provided locally to Asterisk; the web password is stored as a hash. Add-on backups contain these records and require protected storage.
+
+Update the plugin and add-on separately. Switching from web launcher 26.10.12 to the native dialer requires entering SIP details once in the plugin. Disable any separate **SIP Native Dialer Lab** plugin before enabling the regular plugin. See the [migration guide](../README.md#updates).
+
+## Technical limitations and checks
+
+The native dialer supports IPv4, UDP, and G.711. TLS/SRTP, in-call DTMF, hold, transfer, and native contact synchronization are not implemented. Shared microphone management with Voice Satellite remains open. A bounded audio queue does not guarantee a particular end-to-end latency.
+
+Automated tests use simulated SIP devices, fictional credentials, and local Asterisk instances. They check protocol behavior, configuration, the audio bridge, and package format. Connection compatibility, Android acoustics, and actual call latency require measurements under deployment conditions.
+
+## Further reading
+
+- [Home Assistant: app repositories](https://developers.home-assistant.io/docs/apps/repository/)
+- [Home Assistant: ingress](https://developers.home-assistant.io/docs/apps/presentation/)
+- [Asterisk: outbound registrations](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-Outbound-Registrations/)
+- [Asterisk: NAT configuration](https://docs.asterisk.org/Configuration/Channel-Drivers/SIP/Configuring-res_pjsip/Configuring-res_pjsip-to-work-through-NAT/)
+- [Telekom: SIP client configuration](https://www.telekom.de/hilfe/internet-telefonie/telefonie/voice-over-ip-sip-client)
+- [sipgate: SIP devices](https://help.sipgate.de/cloud-telefonanlage/erste-schritte/alles-fur-den-start-mit-sipgate/wie-konfiguriere-ich-mein-voip-telefon-mit-sipgate)
+- [easybell: Asterisk/PJSIP](https://www.easybell.de/hilfe/telefon-konfiguration/ip-telefonanlagen-fuer-unsere-sip-trunks/antwort/asterisk-telefonanlagen/)
+- [FRITZ!Box: IP phone setup](https://fritz.com/apps/knowledge-base/FRITZ-Box-7412/42_IP-Telefon-an-FRITZ-Box-anmelden-und-einrichten/)

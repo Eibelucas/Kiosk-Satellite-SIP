@@ -3,33 +3,89 @@
   "apiVersion": 1,
   "id": "kiosk-satellite-sip",
   "name": "Kiosk Satellite SIP",
-  "version": "26.10.12",
+  "version": "26.10.13",
   "minAndroidSdk": 24,
-  "entryClass": "de.eibelucas.kiosksip.KioskSipPlugin",
-  "description": "Telefonseite mit Kontakten, Kiosk-Karten und Anrufpad für den konfigurierten SIP-Gateway.",
+  "entryClass": "de.eibelucas.kiosksip.nativephone.NativePhonePlugin",
+  "description": "Nativer Telefonknopf mit ausklappbarem Dialer, direkten SIP-Anrufen und eigenen Nebenstellen für mehrere Kiosks.",
   "author": "Eibelucas",
   "license": "Apache-2.0",
   "capabilities": [
+    "overlay",
+    "host.read",
     "host.control"
   ],
   "settings": [
     {
-      "key": "gatewayUrl",
-      "title": "Gateway URL",
-      "description": "Lokale HTTP- oder HTTPS-Adresse des Telefon-Gateways aus dem HA-Assistenten.",
+      "key": "server",
+      "title": "HAOS-IP / Asterisk",
       "type": "string",
-      "default": "http://homeassistant.local:8088/",
-      "group": "Telefon"
+      "default": "",
+      "group": "Geräte-Anmeldung",
+      "description": "Lokale IPv4-Adresse des Home-Assistant-OS-Systems mit dem Asterisk-Telefonserver."
+    },
+    {
+      "key": "port",
+      "title": "Asterisk SIP-Port",
+      "type": "string",
+      "default": "5070",
+      "group": "Geräte-Anmeldung",
+      "description": "SIP-Port des Asterisk-Telefonservers gemäß Einrichtungsassistent."
+    },
+    {
+      "key": "extension",
+      "title": "Eigene Nebenstelle",
+      "type": "string",
+      "default": "100",
+      "group": "Geräte-Anmeldung",
+      "description": "Nummer des eingerichteten SIP-Geräts: 100 für eine Einzelanmeldung oder 101 bis 199 für zusätzliche Geräte."
+    },
+    {
+      "key": "password",
+      "title": "SIP-Passwort dieses Geräts",
+      "type": "secret",
+      "default": "",
+      "group": "Geräte-Anmeldung",
+      "description": "Passwort der Geräte-Nebenstelle aus der Geräteverwaltung im HA-Einrichtungsassistenten."
+    },
+    {
+      "key": "localPort",
+      "title": "Lokaler SIP-Port",
+      "type": "string",
+      "default": "5090",
+      "group": "Erweitert"
+    },
+    {
+      "key": "side",
+      "title": "Bildschirmseite",
+      "type": "select",
+      "default": "right",
+      "options": [
+        "right",
+        "left"
+      ],
+      "group": "Telefonknopf"
+    },
+    {
+      "key": "bottomOffset",
+      "title": "Abstand vom unteren Rand (dp)",
+      "type": "string",
+      "default": "88",
+      "group": "Telefonknopf",
+      "description": "Abstand des Telefonknopfs zur Bildschirmunterkante in dp; Bereich 12 bis 300."
     }
   ],
   "commands": [
     {
-      "id": "openPhone",
-      "title": "Telefon öffnen"
+      "id": "toggleDialer",
+      "title": "Telefonknopf umschalten"
     },
     {
-      "id": "openContacts",
-      "title": "Kontakte öffnen"
+      "id": "openPhone",
+      "title": "Nativen Dialer öffnen"
+    },
+    {
+      "id": "hangup",
+      "title": "Gespräch beenden"
     }
   ]
 }
