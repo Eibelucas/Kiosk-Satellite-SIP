@@ -36,7 +36,11 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
                     }));
                 }
                 public void later(Runnable task,long delay){main.postDelayed(task,delay);}
-            },message->{model.update("error","",text.get(message));refresh();});
+            },message->{
+                if(model.active())model.detail=text.get(message);
+                else model.update("error","",text.get(message));
+                refresh();
+            });
         });
         configure(settings);
         for(String event:new String[]{"intercom.state","voice.state"})try{host.subscribe(event);}catch(Exception ignored){}

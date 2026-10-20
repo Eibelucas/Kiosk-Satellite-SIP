@@ -10,7 +10,7 @@ import java.util.Random;
 
 /** Direct Android audio; no ActivityThread reflection or browser microphone.
  * G.711 conversion adapted from meiser79 SIP Phone (see NOTICE).
- * Audio focus is local Android focus, not KS's still-missing shared capture lease.
+ * Android audio focus does not provide a shared capture lease with KS.
  */
 final class AndroidG711 implements NativeSipClient.Media {
     static final class Offer {

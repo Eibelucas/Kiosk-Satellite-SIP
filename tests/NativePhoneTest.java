@@ -171,6 +171,9 @@ public final class NativePhoneTest {
         f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",true,true);f.state(true,false,true);
         f.guard.release();f.reply("setWakeWordMuted",false,null);
         check(f.warnings==1&&!f.guard.busy(),"restore failure is visible and does not deadlock guard");
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",true,true);f.state(true,false,true);
+        f.guard.release();f.reply("setWakeWordMuted",true,true);
+        check(f.warnings==1,"restore result must confirm the original unmuted state");
 
         f=new WakeBridge();f.acquire();f.state(true,true,false);f.guard.abandon();
         f.reply("setWakeWordMuted",true,true);

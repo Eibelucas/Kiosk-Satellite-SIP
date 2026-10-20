@@ -87,7 +87,7 @@ final class WakeWordGuard {
         command("setWakeWordMuted",Collections.singletonMap("muted",false),(ok,data)->{
             if(run!=ticket||phase!=Phase.RESTORING)return;
             muteRequested=false;phase=Phase.IDLE;
-            if(!ok)warning.accept("Could not restore wake word. Check its mute switch in Kiosk Satellite.");
+            if(!ok||!Boolean.FALSE.equals(data))warning.accept("Could not restore wake word. Check its mute switch in Kiosk Satellite.");
         });
     }
     /** The host revokes commands before stop; do not issue API calls from stop. */
