@@ -92,10 +92,10 @@ Ringing targets can be restricted under **Klingelnde SIP-Geräte für diese Rufn
 
 1. In the final connection step (**Verbinden**), review the summary and default outgoing number.
 2. Select **Save and start Asterisk** (**Speichern und Asterisk starten**). This interrupts active calls.
-3. Install or update **Kiosk Satellite SIP** in the KS plugin manager and enable it.
+3. Install or update **SIP Phone for Kiosk Satellite** in the KS plugin manager and enable it.
 4. Enter the HAOS address, SIP port, device extension, and its password in the plugin.
 
-The status **Bereit · Nebenstelle …** confirms plugin registration. **Verbindung prüfen** in the HA assistant also shows Asterisk and provider account status.
+The status **Ready · Extension …** confirms plugin registration. **Verbindung prüfen** in the HA assistant also shows Asterisk and provider account status.
 
 When editing unchanged accounts or devices later, leaving password fields blank preserves their stored values. The setup interface does not return provider or device passwords. Changes to the LAN web address or gateway port also require an add-on restart.
 
@@ -104,12 +104,16 @@ When editing unchanged accounts or devices later, leaving password fields blank 
 1. Dial **600 in the native dialer**. This uses Asterisk's local echo context and plays captured speech back to the device.
 2. Check mute and hangup.
 3. The provider number must appear as registered (**registriert**) in the assistant.
-4. Enter an external number approved for the test and select **Call** (**Anrufen**). The remote party is called directly.
+4. Enter an external number approved for the test and select **Call**. The remote party is called directly.
 5. Call the configured external number from another phone and answer at the kiosk.
 
-Incoming calls require manual acceptance. Collapsing the panel keeps a call active; **Hang up** (**Auflegen**) ends it. Internal kiosk calls remain available through KS intercom.
+Incoming calls require manual acceptance. Collapsing the panel keeps a call active; **Hang up** ends it. Internal kiosk calls remain available through KS intercom.
 
-Native SIP calls require the microphone to be free from Voice Satellite or other recording. Shared microphone coordination is not implemented; detected active voice and intercom sessions block a new call.
+Before placing or answering a call, the plugin temporarily mutes wake word with the KS host API and waits for listening to stop. The previous mute state is restored after hangup, cancellation, or failure. Ringing alone does not change wake word. Active Voice Satellite turns and intercom sessions still block or end calls.
+
+If automatic muting fails or does not free the microphone, **pause wake word in Kiosk Satellite before placing or answering the call**. This may depend on the host version, wake word engine, and Android device; automated tests do not verify physical microphone release. End calls before disabling or updating the plugin. If KS or the plugin stops during a call, check the wake word mute switch afterward because restoration is unavailable after host access is revoked.
+
+Plugin settings and the default dialer use English. Select **Language → Deutsch** for German call controls and status messages.
 
 ## Web phone and intercom bridge
 
@@ -160,7 +164,7 @@ Busy targets are skipped, and additional simultaneous announcements are rejected
 | Registration switches between devices | Use a separate extension for each device and check for duplicate plugin instances. |
 | SIP 404 on an external call | Check the default outgoing number and route, then the destination and provider response. |
 | Provider account does not register | Check the profile, registrar, credentials, DNS, and SIP service connectivity. |
-| No audio in the local echo test | Check microphone permission, active recording, output routing, Wi-Fi isolation, and RTP traffic. |
+| No audio in the local echo test | Check microphone permission, active voice/intercom sessions, output routing, Wi-Fi isolation, and RTP traffic. If automatic muting does not release capture, pause wake word in KS before calling. |
 | One-way audio | Check the local network, public address, and RTP NAT configuration. |
 | High voice delay | Compare the local echo test with an external call; check output routing, network load, and packet loss. |
 | Web phone page unavailable | Check LAN access, gateway port, and web credentials; restart after address changes. |
@@ -177,7 +181,7 @@ Update the plugin and add-on separately. Switching from web launcher 26.10.12 to
 
 ## Technical limitations and checks
 
-The native dialer supports IPv4, UDP, and G.711. TLS/SRTP, in-call DTMF, hold, transfer, and native contact synchronization are not implemented. Shared microphone management with Voice Satellite remains open. A bounded audio queue does not guarantee a particular end-to-end latency.
+The native dialer supports IPv4, UDP, and G.711. TLS/SRTP, in-call DTMF, hold, transfer, and native contact synchronization are not implemented. Wake word coordination uses temporary host muting rather than a shared microphone lease. The RTP destination must equal the configured PBX address resolved for the SIP connection; separate media hosts and direct media are not supported. A bounded audio queue does not guarantee a particular end-to-end latency.
 
 Automated tests use simulated SIP devices, fictional credentials, and local Asterisk instances. They check protocol behavior, configuration, the audio bridge, and package format. Connection compatibility, Android acoustics, and actual call latency require measurements under deployment conditions.
 

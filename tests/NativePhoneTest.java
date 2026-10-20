@@ -13,9 +13,9 @@ public final class NativePhoneTest {
     static void check(boolean ok,String why){assertions++;if(!ok)throw new AssertionError(why);}
     static void await(BooleanSupplier ok,String why)throws Exception{long end=System.currentTimeMillis()+3000;while(!ok.getAsBoolean()&&System.currentTimeMillis()<end)Thread.sleep(10);check(ok.getAsBoolean(),why);}
     static final class Audio implements NativeSipClient.Media {
-        int starts,closed;boolean muted;volatile boolean healthy=true;
-        public String offer(){return sdp();}public String answer(String sdp){return sdp();}
-        public void start(String sdp){starts++;}public void mute(boolean on){muted=on;}public void close(){closed++;}
+        InetAddress expectedPbx;int starts,closed;boolean muted;volatile boolean healthy=true;
+        public String offer(){return sdp();}public String answer(String remote)throws Exception{AndroidG711.pbxOffer(remote,expectedPbx);return sdp();}
+        public void start(String remote)throws Exception{AndroidG711.pbxOffer(remote,expectedPbx);starts++;}public void mute(boolean on){muted=on;}public void close(){closed++;}
         public boolean healthy(){return healthy;}
     }
     static String sdp(){return "v=0\r\nc=IN IP4 127.0.0.1\r\nm=audio 30000 RTP/AVP 0\r\na=rtpmap:0 PCMU/8000\r\na=sendrecv\r\n";}
@@ -26,7 +26,7 @@ public final class NativePhoneTest {
         Fixture(String extension)throws Exception{
             this.extension=extension;
             pbx.setSoTimeout(3500);int local;try(DatagramSocket probe=new DatagramSocket(0)){local=probe.getLocalPort();}
-            sip=new NativeSipClient(new NativeSipClient.Config("127.0.0.1",pbx.getLocalPort(),extension,"fake-phone-secret",local),new NativeSipClient.Events(){public void registration(boolean ready){}public void call(String s,String p,String d){state=s;states.add(s);}},address->{Audio a=new Audio();media.add(a);return a;});
+            sip=new NativeSipClient(new NativeSipClient.Config("127.0.0.1",pbx.getLocalPort(),extension,"fake-phone-secret",local),new NativeSipClient.Events(){public void registration(boolean ready){}public void call(String s,String p,String d){state=s;states.add(s);}},(address,pbxAddress)->{Audio a=new Audio();a.expectedPbx=pbxAddress;media.add(a);return a;});
             sip.start();SipMessage register=receive("REGISTER");send(response(register,401,"Unauthorized","WWW-Authenticate: Digest realm=\"asterisk\", nonce=\"fake-register-nonce\", algorithm=MD5, qop=\"auth\"\r\n",""));
             SipMessage authenticated=receive("REGISTER");check(authenticated.header("authorization")!=null,"REGISTER has digest");check(!authenticated.header("authorization").contains("fake-phone-secret"),"password is not on wire");verifyDigest(authenticated,"REGISTER","fake-register-nonce");
             send(response(authenticated,200,"OK","Expires: 120\r\n",""));await(sip::registered,"registered");
@@ -39,7 +39,7 @@ public final class NativePhoneTest {
         void verifyDigest(SipMessage message,String method,String nonce){Map<String,String> p=SipDigest.parseParams(message.header("authorization"));check(p.get("username").equals(extension),"correct per-device digest user");String expected=SipDigest.response(extension,"asterisk","fake-phone-secret",method,p.get("uri"),nonce,p.get("qop"),p.get("nc"),p.get("cnonce"));check(expected.equals(p.get("response")),"correct digest response");}
     }
     public static void main(String[] args)throws Exception{
-        model();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices();
+        wakeWord();rtpPolicy();redirectedCall();languages();model();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices();
         System.out.println("Native phone: "+assertions+" assertions passed (loopback SIP + model)");
     }
     static void model(){DialerModel m=new DialerModel();check(!m.canDial(),"unregistered cannot dial");m.registered=true;m.digit("1");m.digit("0");m.digit("1");check(m.canDial(),"registered number can dial");m.update("calling","101","Verbindet");m.expanded=false;check(m.active(),"collapse preserves call");m.digit("9");check(m.number.equals("101"),"cannot edit active number");m.update("connected","","Verbunden");long time=m.connectedAt;m.update("connected","","Verbunden");check(m.connectedAt==time,"duplicate event preserves duration");m.update("idle","","Beendet");check(m.canDial(),"call can be repeated");m.delete();check(!m.canDial(),"short invalid number rejected");}
@@ -98,4 +98,108 @@ public final class NativePhoneTest {
     static void independentDevices()throws Exception{try(Fixture first=new Fixture("101");Fixture second=new Fixture("102")){
         check(first.sip.registered()&&second.sip.registered(),"two device clients registered simultaneously");first.sip.dial("102");SipMessage a=first.receive("INVITE");second.sip.dial("101");SipMessage b=second.receive("INVITE");check(a.header("from").contains("sip:101@"),"first device uses own identity");check(b.header("from").contains("sip:102@"),"second device uses own identity");check(a.header("contact").contains("sip:101@"),"first contact separated");check(b.header("contact").contains("sip:102@"),"second contact separated");check(!a.header("call-id").equals(b.header("call-id")),"devices have isolated dialogs");first.send(first.response(a,486,"Busy Here","",""));second.send(second.response(b,486,"Busy Here","",""));first.receive("ACK");second.receive("ACK");
     }}
+
+    static final class WakeBridge implements WakeWordGuard.Bridge {
+        static final class Pending {
+            String name;Map<String,Object> args;WakeWordGuard.Result result;
+            Pending(String name,Map<String,Object> args,WakeWordGuard.Result result){this.name=name;this.args=args;this.result=result;}
+        }
+        final Deque<Pending> pending=new ArrayDeque<>();
+        final Deque<Runnable> delayed=new ArrayDeque<>();
+        final List<String> writes=new ArrayList<>();
+        int allowed,rejected,warnings;String error;
+        final WakeWordGuard guard=new WakeWordGuard(this,message->{warnings++;error=message;});
+        public void command(String name,Map<String,Object> args,WakeWordGuard.Result result){
+            pending.add(new Pending(name,args,result));
+            if(name.equals("setWakeWordMuted"))writes.add(String.valueOf(args.get("muted")));
+        }
+        public void later(Runnable task,long delay){check(delay>=250,"bounded wake-word poll rate");delayed.add(task);}
+        void acquire(){guard.acquire(()->allowed++,message->{rejected++;error=message;});}
+        void reply(String command,boolean ok,Object data){
+            Pending p=pending.remove();check(p.name.equals(command),"expected host command "+command);
+            p.result.done(ok,data);
+        }
+        void state(boolean enabled,boolean listening,boolean muted){
+            Map<String,Object> state=new HashMap<>();state.put("enabled",enabled);state.put("listening",listening);state.put("muted",muted);
+            reply("getWakeWordState",true,state);
+        }
+    }
+    static void wakeWord() {
+        WakeBridge f=new WakeBridge();f.acquire();f.state(true,true,false);
+        check(f.allowed==0,"listening wake word does not start call before mute");
+        f.reply("setWakeWordMuted",true,true);f.state(true,true,true);
+        check(f.allowed==0,"mute acknowledgement alone does not imply microphone release");
+        f.delayed.remove().run();f.state(true,false,true);
+        check(f.allowed==1&&f.rejected==0,"call allowed once microphone is released");
+        f.guard.release();check(f.guard.busy(),"new calls wait until previous mute state is restored");
+        f.reply("setWakeWordMuted",true,false);
+        check(f.writes.equals(Arrays.asList("true","false"))&&!f.guard.busy(),"previous unmuted state restored after call");
+
+        f=new WakeBridge();f.acquire();f.state(true,false,true);
+        check(f.allowed==1&&f.writes.isEmpty(),"already-muted wake word needs no write");
+        f.guard.release();check(f.writes.isEmpty()&&!f.guard.busy(),"already-muted user preference preserved");
+        f=new WakeBridge();f.acquire();f.state(false,false,false);
+        check(f.allowed==1&&f.writes.isEmpty(),"disabled wake word does not require a mute control");
+        f.guard.release();
+
+        f=new WakeBridge();f.acquire();f.guard.release();f.state(true,true,false);
+        check(f.allowed==0&&f.writes.isEmpty()&&!f.guard.busy(),"cancel during state query never mutes or starts audio");
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.guard.release();
+        check(f.pending.size()==1,"cancel waits for pending mute completion");
+        f.reply("setWakeWordMuted",true,true);
+        check(f.allowed==0&&f.writes.equals(Arrays.asList("true","false")),"late mute after cancellation is restored without starting call");
+        f.reply("setWakeWordMuted",true,false);
+
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",false,null);
+        check(f.rejected==1&&f.allowed==0,"failed mute rejects call");
+        f.reply("setWakeWordMuted",true,false);
+        check(!f.guard.busy(),"failed or timed-out mute still attempts previous-state restoration");
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",true,true);
+        for(int i=0;i<10;i++){f.state(true,true,true);if(i<9)f.delayed.remove().run();}
+        check(f.rejected==1&&f.allowed==0&&f.error.contains("Pause wake word"),"microphone held after mute reports manual pause requirement");
+        f.reply("setWakeWordMuted",true,false);
+
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",true,true);
+        WakeBridge.Pending late=f.pending.remove();f.guard.release();f.reply("setWakeWordMuted",true,false);
+        Map<String,Object> released=new HashMap<>();released.put("muted",true);released.put("listening",false);
+        late.result.done(true,released);
+        check(f.allowed==0&&!f.guard.busy(),"late microphone verification cannot resurrect cancelled call");
+
+        f=new WakeBridge();f.acquire();f.reply("getWakeWordState",false,null);
+        check(f.rejected==1&&f.writes.isEmpty(),"unavailable state is explicit and does not change mute");
+        f=new WakeBridge();f.acquire();f.state(true,false,true);f.guard.release();
+        f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",true,true);f.state(true,false,true);
+        f.guard.release();f.reply("setWakeWordMuted",false,null);
+        check(f.warnings==1&&!f.guard.busy(),"restore failure is visible and does not deadlock guard");
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.reply("setWakeWordMuted",true,true);f.state(true,false,true);
+        f.guard.release();f.reply("setWakeWordMuted",true,true);
+        check(f.warnings==1,"restore result must confirm the original unmuted state");
+
+        f=new WakeBridge();f.acquire();f.state(true,true,false);f.guard.abandon();
+        f.reply("setWakeWordMuted",true,true);
+        check(f.allowed==0&&f.writes.size()==1&&!f.guard.busy(),"revoked session does not invoke host from stop or accept stale mute callback");
+    }
+    static void rtpPolicy() throws Exception {
+        InetAddress pbx=InetAddress.getByName("192.168.50.10");
+        String allowed=sdp().replace("127.0.0.1","192.168.50.10");
+        check(AndroidG711.pbxOffer(allowed,pbx).address.equals(pbx),"RTP to resolved PBX is accepted");
+        for(String address:new String[]{"192.168.50.11","10.0.0.20","172.16.0.2","127.0.0.1","8.8.8.8"}){
+            boolean rejected=false;
+            try{AndroidG711.pbxOffer(sdp().replace("127.0.0.1",address),pbx);}catch(IllegalArgumentException expected){rejected=true;}
+            check(rejected,"RTP redirection to "+address+" is rejected");
+        }
+        check(AndroidG711.pbxOffer(sdp(),InetAddress.getByName("127.0.0.1")).payload==0,"explicit loopback PBX remains valid");
+    }
+    static void redirectedCall()throws Exception{try(Fixture f=new Fixture()){
+        SipMessage invite=f.dial();f.send(f.response(invite,200,"OK","",sdp().replace("127.0.0.1","192.168.50.11")));
+        f.receive("ACK");f.receive("BYE");await(()->f.state.equals("error"),"redirected RTP ends outgoing call");
+        check(f.media.get(0).starts==0,"redirected SDP is rejected before microphone starts");
+    }}
+    static void languages(){
+        PhoneText en=new PhoneText("English"),de=new PhoneText("Deutsch");
+        check(en.get("Call").equals("Call"),"English default UI");
+        check(de.get("Call").equals("Anrufen"),"German UI remains selectable");
+        check(de.get("Call ended: SIP 404").equals("Anruf beendet: SIP 404"),"dynamic SIP status is translated");
+        check(en.get(null).isEmpty(),"absent error is safe");
+    }
 }

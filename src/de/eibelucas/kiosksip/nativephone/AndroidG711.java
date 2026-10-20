@@ -10,7 +10,7 @@ import java.util.Random;
 
 /** Direct Android audio; no ActivityThread reflection or browser microphone.
  * G.711 conversion adapted from meiser79 SIP Phone (see NOTICE).
- * Audio focus is local Android focus, not KS's still-missing shared capture lease.
+ * Android audio focus does not provide a shared capture lease with KS.
  */
 final class AndroidG711 implements NativeSipClient.Media {
     static final class Offer {
@@ -18,7 +18,7 @@ final class AndroidG711 implements NativeSipClient.Media {
         Offer(InetAddress a,int p,int pt){address=a;port=p;payload=pt;}
     }
     private final Context context;
-    private final InetAddress local;
+    private final InetAddress local,pbx;
     private final DatagramSocket rtp;
     private volatile Offer remote;
     private volatile boolean running,muted,closed;
@@ -33,9 +33,9 @@ final class AndroidG711 implements NativeSipClient.Media {
     private int sequence=random.nextInt(65536),timestamp=random.nextInt();
     private final int ssrc=random.nextInt();
 
-    AndroidG711(InetAddress local,Context context)throws Exception{
+    AndroidG711(InetAddress local,InetAddress pbx,Context context)throws Exception{
         if(context==null)throw new IllegalStateException("Dialer not ready");
-        this.local=local;this.context=context.getApplicationContext();
+        this.local=local;this.pbx=pbx;this.context=context.getApplicationContext();
         rtp=new DatagramSocket(new InetSocketAddress(local,0));rtp.setSoTimeout(200);
     }
     static Offer parseOffer(String sdp)throws Exception{
@@ -54,9 +54,17 @@ final class AndroidG711 implements NativeSipClient.Media {
         if(ip==null||!ip.matches("[0-9.]{7,15}")||port<1||port>65535||payload<0)throw new IllegalArgumentException("Invalid G.711 SDP");
         return new Offer(InetAddress.getByName(ip),port,payload);
     }
-    private String sdp(String payloads){return "v=0\r\no=- "+Integer.toUnsignedString(ssrc)+" 1 IN IP4 "+local.getHostAddress()+"\r\ns=Native SIP Lab\r\nc=IN IP4 "+local.getHostAddress()+"\r\nt=0 0\r\nm=audio "+rtp.getLocalPort()+" RTP/AVP "+payloads+"\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=ptime:20\r\na=sendrecv\r\n";}
+    private String sdp(String payloads){return "v=0\r\no=- "+Integer.toUnsignedString(ssrc)+" 1 IN IP4 "+local.getHostAddress()+"\r\ns=SIP Phone\r\nc=IN IP4 "+local.getHostAddress()+"\r\nt=0 0\r\nm=audio "+rtp.getLocalPort()+" RTP/AVP "+payloads+"\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=ptime:20\r\na=sendrecv\r\n";}
     public String offer(){return sdp("0 8");}
-    private void negotiate(String sdp)throws Exception{remote=parseOffer(sdp);if(!remote.address.equals(local)&&!remote.address.isSiteLocalAddress())throw new IllegalArgumentException("Only LAN RTP is supported");}
+    static Offer pbxOffer(String sdp,InetAddress pbx)throws Exception{
+        Offer offer=parseOffer(sdp);
+        if(!offer.address.equals(pbx))throw new IllegalArgumentException("RTP address must match the configured PBX");
+        return offer;
+    }
+    private void negotiate(String sdp)throws Exception{
+        remote=pbxOffer(sdp,pbx);
+        rtp.connect(remote.address,remote.port);
+    }
     public String answer(String sdp)throws Exception{negotiate(sdp);return sdp(String.valueOf(remote.payload));}
     public boolean healthy(){return !closed;}
     public void mute(boolean value){muted=value;}
