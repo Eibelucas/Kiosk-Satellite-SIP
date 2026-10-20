@@ -7,7 +7,7 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** Experimental single-dialog SIP endpoint per kiosk for a directly attached LAN Asterisk.
+/** Single-dialog SIP endpoint per kiosk for a directly attached LAN Asterisk.
  * The worker owns SIP, timers and media. UI commands only enqueue work.
  * No AMI Originate, intercom invitation or auto-answer setting is involved.
  */
@@ -24,7 +24,7 @@ public final class NativeSipClient {
         void close();
         default boolean healthy(){return true;}
     }
-    public interface MediaFactory { Media open(InetAddress local) throws Exception; }
+    public interface MediaFactory { Media open(InetAddress local,InetAddress pbx) throws Exception; }
     public static final class Config {
         public final String server, user, password;
         public final int port, localPort;
@@ -32,11 +32,11 @@ public final class NativeSipClient {
             this(server,port,"100",password,localPort);
         }
         public Config(String server, int port, String user, String password, int localPort) {
-            if(user==null||!user.matches("1[0-9]{2}"))throw new IllegalArgumentException("Nebenstelle von 100 bis 199 eingeben.");
+            if(user==null||!user.matches("1[0-9]{2}"))throw new IllegalArgumentException("Enter an extension from 100 to 199.");
             if (server == null || !server.matches("[a-zA-Z0-9.-]{1,253}") || server.startsWith("-") ||
                     port < 1 || port > 65535 || localPort < 1024 || localPort > 65535 ||
                     password == null || password.length() < 8 || password.length() > 256 ||
-                    password.matches("(?s).*[\\p{Cntrl}].*")) throw new IllegalArgumentException("SIP-Adresse, Ports und Geräte-SIP-Passwort prüfen.");
+                    password.matches("(?s).*[\\p{Cntrl}].*")) throw new IllegalArgumentException("Check the PBX address, ports and device SIP password.");
             this.server=server; this.user=user; this.port=port; this.password=password; this.localPort=localPort;
         }
     }
@@ -78,10 +78,10 @@ public final class NativeSipClient {
 
     public NativeSipClient(Config cfg, Events events, MediaFactory factory) { this.cfg=cfg;this.events=events;this.factory=factory; }
     public boolean registered() { return registered; }
-    public void start() { if(running)return;running=true;worker=new Thread(this::run,"native-sip-lab");worker.setDaemon(true);worker.start(); }
+    public void start() { if(running)return;running=true;worker=new Thread(this::run,"sip-phone");worker.setDaemon(true);worker.start(); }
     public void dial(String number) {
-        if(number==null||!number.matches("\\+?[0-9*#]{3,20}"))throw new IllegalArgumentException("Nummer: 3 bis 20 Ziffern, optional +, * oder #.");
-        if(!running||!registered)throw new IllegalStateException("Das Gerät ist noch nicht angemeldet.");
+        if(number==null||!number.matches("\\+?[0-9*#]{3,20}"))throw new IllegalArgumentException("Number: 3 to 20 digits, with optional +, * or #.");
+        if(!running||!registered)throw new IllegalStateException("This device is not registered yet.");
         commands.add(()->begin(number));
     }
     public void answer() { commands.add(this::accept); }
@@ -96,7 +96,7 @@ public final class NativeSipClient {
     private void run() {
         try {
             pbx=InetAddress.getByName(cfg.server);
-            if(!(pbx instanceof Inet4Address))throw new IllegalArgumentException("Der Test unterstützt nur IPv4.");
+            if(!(pbx instanceof Inet4Address))throw new IllegalArgumentException("Only IPv4 is supported.");
             target=new InetSocketAddress(pbx,cfg.port);
             try(DatagramSocket probe=new DatagramSocket()){probe.connect(target);local=probe.getLocalAddress();}
             socket=new DatagramSocket(new InetSocketAddress(local,cfg.localPort));socket.setSoTimeout(100);
@@ -111,9 +111,9 @@ public final class NativeSipClient {
                 SipMessage msg=SipMessage.parse(new String(packet.getData(),0,packet.getLength(),StandardCharsets.UTF_8));
                 if(msg==null)continue;
                 try { if(msg.isRequest())request(msg);else response(msg); }
-                catch(Exception badMessage){finish("Anruf konnte nicht verarbeitet werden.");}
+                catch(Exception badMessage){finish("Could not process the call.");}
             }
-        } catch(Exception e) { notifyCall("error","","SIP-Verbindung fehlgeschlagen. IP, Port, Passwort und Mikrofon prüfen."); }
+        } catch(Exception e) { notifyCall("error","","SIP connection failed. Check the address, port, password and microphone."); }
         finally {
             if(dialog!=null){try{end();}catch(Exception ignored){}if(dialog!=null&&dialog.media!=null)dialog.media.close();dialog=null;}
             if(socket!=null){socket.close();socket=null;}registered=false;events.registration(false);commands.clear();
@@ -127,8 +127,8 @@ public final class NativeSipClient {
         else if(regRequest!=null&&now>=regRetryAt){send(regRequest);regInterval=Math.min(4000,regInterval*2);regRetryAt=now+regInterval;}
         Dialog d=dialog;
         if(d==null)return;
-        if(d.established){if(d.media!=null&&!d.media.healthy()){end();notifyCall("error","","Audio unterbrochen. Gespräch beendet.");}return;}
-        if(now>=d.deadline){if(d.outgoing){d.cancel=true;if(d.provisional)sendCancel(d);}else send(reply(d.invite,480,"Temporarily Unavailable",d.to,""));finish("Keine Antwort / Zeitüberschreitung.");return;}
+        if(d.established){if(d.media!=null&&!d.media.healthy()){end();notifyCall("error","","Audio interrupted. Call ended.");}return;}
+        if(now>=d.deadline){if(d.outgoing){d.cancel=true;if(d.provisional)sendCancel(d);}else send(reply(d.invite,480,"Temporarily Unavailable",d.to,""));finish("No answer / timeout.");return;}
         if(d.outgoing&&!d.provisional&&now>=d.retryAt){send(d.lastRequest);d.interval=Math.min(4000,d.interval*2);d.retryAt=now+d.interval;}
         if(!d.outgoing&&d.started&&now>=d.retryAt){send(d.lastRequest);d.interval=Math.min(4000,d.interval*2);d.retryAt=now+d.interval;}
     }
@@ -141,14 +141,14 @@ public final class NativeSipClient {
         long now=System.nanoTime()/1_000_000;regDeadline=now+8000;regInterval=500;regRetryAt=now+500;registerAt=now+60000;send(regRequest);
     }
     private void begin(String number) {
-        if(dialog!=null){notifyCall("busy",number,"Es läuft bereits ein Anruf.");return;}
-        if(!registered){notifyCall("error",number,"SIP nicht angemeldet.");return;}
+        if(dialog!=null){notifyCall("busy",number,"A call is already active.");return;}
+        if(!registered){notifyCall("error",number,"SIP not registered.");return;}
         Dialog d=new Dialog();d.outgoing=true;d.id=id();d.from="<sip:"+cfg.user+"@"+cfg.server+">;tag="+id();
         // # is escaped in a SIP URI; Asterisk decodes the destination user.
         d.uri="sip:"+number.replace("#","%23")+"@"+cfg.server;d.to="<"+d.uri+">";d.branch=branch();
         dialog=d;
-        try{d.media=factory.open(local);invite(d,null);notifyCall("calling",number,"Verbindet …");}
-        catch(Exception e){finish("Audio konnte nicht vorbereitet werden. Mikrofonberechtigung prüfen.");}
+        try{d.media=factory.open(local,pbx);invite(d,null);notifyCall("calling",number,"Connecting …");}
+        catch(Exception e){finish("Could not prepare audio. Check microphone permission.");}
     }
     private void invite(Dialog d,SipMessage challenge) throws Exception {
         String sdp=d.media.offer();String auth=challenge==null?"":auth(challenge,"INVITE",d.uri);
@@ -174,23 +174,23 @@ public final class NativeSipClient {
         if(d==null){if(closedId!=null&&closedId.equals(m.header("call-id"))&&"INVITE".equals(m.cseqMethod())&&m.status()==200&&System.nanoTime()/1_000_000<closedUntil&&closedAck!=null)send(closedAck);return;}
         if(!d.outgoing||!d.id.equals(m.header("call-id"))||!"INVITE".equals(m.cseqMethod())||m.cseqNumber()!=d.seq||!viaMatches(m,d.branch))return;
         int code=m.status();if(code<100)return;
-        if(code<200){d.provisional=true;if(code>=180&&!d.cancel)notifyCall("ringing","","Klingelt beim Ziel …");if(d.cancel)sendCancel(d);return;}
+        if(code<200){d.provisional=true;if(code>=180&&!d.cancel)notifyCall("ringing","","Ringing …");if(d.cancel)sendCancel(d);return;}
         String to=m.header("to");if(to==null)return;
         if(code>=300){send(headers("ACK",d.uri,d.branch,d.from,to,d.id,d.seq)+"Content-Length: 0\r\n\r\n");
             if((code==401||code==407)&&!d.authorized&&!d.cancel){d.authorized=true;d.seq++;d.branch=branch();invite(d,m);return;}
-            finish(d.cancel?"Anruf abgebrochen.":"Anruf beendet: SIP "+code);return;
+            finish(d.cancel?"Call cancelled.":"Call ended: SIP "+code);return;
         }
         if(code!=200)return;
         String remoteUri=contact(m.header("contact"));
-        if(remoteUri==null){finish("Ungültiges SIP-Ziel.");return;}
-        // Direct Asterisk dialog only. A proxy route set is outside this lab's scope.
-        if(!m.all("record-route").isEmpty()){finish("SIP-Proxys mit Record-Route werden im Test nicht unterstützt.");return;}
+        if(remoteUri==null){finish("Invalid SIP destination.");return;}
+        // Direct Asterisk dialog only. A proxy route set is not supported.
+        if(!m.all("record-route").isEmpty()){finish("SIP proxies with Record-Route are not supported.");return;}
         d.to=to;d.uri=remoteUri;d.ack=headers("ACK",d.uri,branch(),d.from,d.to,d.id,d.seq)+"Content-Length: 0\r\n\r\n";send(d.ack);
         if(d.established)return;
         d.established=true;
         if(d.cancel){end();return;}
-        try{d.media.start(m.body);notifyCall("connected","","Verbunden");}
-        catch(Exception e){end();notifyCall("error","","Audio nicht verfügbar. Mikrofon und Audio-Zugriff prüfen.");}
+        try{d.media.start(m.body);notifyCall("connected","","Connected");}
+        catch(Exception e){end();notifyCall("error","","Audio unavailable. Check microphone permission and audio access.");}
     }
     private void request(SipMessage m) throws Exception {
         for(String key:new String[]{"via","from","to","call-id","cseq"})if(m.header(key)==null)return;
@@ -203,27 +203,27 @@ public final class NativeSipClient {
             d=new Dialog();d.id=m.header("call-id");d.invite=m;d.from=m.header("from");d.to=m.header("to")+";tag="+id();d.uri=contact(m.header("contact"));
             if(d.uri==null){send(reply(m,400,"Bad Request",d.to,""));return;}
             d.deadline=System.nanoTime()/1_000_000+45000;d.seq=m.cseqNumber();d.lastRequest=reply(m,180,"Ringing",d.to,"");dialog=d;send(d.lastRequest);
-            notifyCall("incoming",SipMessage.caller(d.from),"Eingehender Anruf");return;
+            notifyCall("incoming",SipMessage.caller(d.from),"Incoming call");return;
         }
         if("ACK".equals(method)){
             if(same&&!d.outgoing&&d.started&&!d.established&&m.cseqNumber()==d.seq&&dialogMatches(m,d)){
-                try{d.media.start(d.invite.body);d.established=true;notifyCall("connected","","Verbunden");}catch(Exception e){d.established=true;end();}
+                try{d.media.start(d.invite.body);d.established=true;notifyCall("connected","","Connected");}catch(Exception e){d.established=true;end();}
             }return;
         }
-        if("CANCEL".equals(method)&&same&&!d.outgoing&&!d.established&&m.cseqNumber()==d.seq){send(reply(m,200,"OK",d.to,""));send(reply(d.invite,487,"Request Terminated",d.to,""));finish("Anruf abgebrochen.");return;}
-        if("BYE".equals(method)&&same&&d.established&&dialogMatches(m,d)){send(reply(m,200,"OK",m.header("to"),""));finish("Gespräch beendet.");return;}
+        if("CANCEL".equals(method)&&same&&!d.outgoing&&!d.established&&m.cseqNumber()==d.seq){send(reply(m,200,"OK",d.to,""));send(reply(d.invite,487,"Request Terminated",d.to,""));finish("Call cancelled.");return;}
+        if("BYE".equals(method)&&same&&d.established&&dialogMatches(m,d)){send(reply(m,200,"OK",m.header("to"),""));finish("Call ended.");return;}
         if("BYE".equals(method)&&d==null&&closedId!=null&&closedId.equals(m.header("call-id"))&&System.nanoTime()/1_000_000<closedUntil){send(reply(m,200,"OK",m.header("to"),""));return;}
         send(reply(m,481,"Call/Transaction Does Not Exist",m.header("to"),""));
     }
     private void accept(){Dialog d=dialog;if(d==null||d.outgoing||d.started)return;try{
-        d.media=factory.open(local);String sdp=d.media.answer(d.invite.body);d.started=true;d.lastRequest=reply(d.invite,200,"OK",d.to,sdp);
+        d.media=factory.open(local,pbx);String sdp=d.media.answer(d.invite.body);d.started=true;d.lastRequest=reply(d.invite,200,"OK",d.to,sdp);
         long now=System.nanoTime()/1_000_000;d.deadline=now+8000;d.retryAt=now+500;send(d.lastRequest);
-    }catch(Exception e){try{send(reply(d.invite,488,"Not Acceptable Here",d.to,""));}catch(Exception ignored){}finish("Audio nicht verfügbar.");}}
+    }catch(Exception e){try{send(reply(d.invite,488,"Not Acceptable Here",d.to,""));}catch(Exception ignored){}finish("Audio unavailable.");}}
     private void end(){Dialog d=dialog;if(d==null)return;try{
-        if(d.established){String from=d.outgoing?d.from:d.to,to=d.outgoing?d.to:d.from;queue(headers("BYE",d.uri,branch(),from,to,d.id,++d.seq)+"Content-Length: 0\r\n\r\n");finish("Gespräch beendet.");}
-        else if(d.outgoing){d.cancel=true;if(d.provisional)sendCancel(d);if(d.media!=null)d.media.close();notifyCall("cancelling","","Wird abgebrochen …");}
-        else {d.lastRequest=reply(d.invite,603,"Decline",d.to,"");rememberIncoming(d,d.lastRequest);send(d.lastRequest);finish("Anruf abgelehnt.");}
-    }catch(Exception e){finish("Verbindung beendet.");}}
+        if(d.established){String from=d.outgoing?d.from:d.to,to=d.outgoing?d.to:d.from;queue(headers("BYE",d.uri,branch(),from,to,d.id,++d.seq)+"Content-Length: 0\r\n\r\n");finish("Call ended.");}
+        else if(d.outgoing){d.cancel=true;if(d.provisional)sendCancel(d);if(d.media!=null)d.media.close();notifyCall("cancelling","","Cancelling …");}
+        else {d.lastRequest=reply(d.invite,603,"Decline",d.to,"");rememberIncoming(d,d.lastRequest);send(d.lastRequest);finish("Call declined.");}
+    }catch(Exception e){finish("Connection ended.");}}
     private void sendCancel(Dialog d)throws Exception {if(d.cancelSent)return;d.cancelSent=true;queue(headers("CANCEL",d.uri,d.branch,d.from,d.to,d.id,d.seq)+"Content-Length: 0\r\n\r\n");}
     private void rememberIncoming(Dialog d,String response){finalIncomingId=d.id;finalIncomingResponse=response;String via=d.invite.header("via");int at=via.indexOf("branch=");finalIncomingBranch=at<0?"":via.substring(at+7).split("[;\\s]",2)[0];finalIncomingUntil=System.nanoTime()/1_000_000+32000;}
     private void queue(String request)throws Exception {SipMessage m=SipMessage.parse(request);Transaction t=new Transaction();t.request=request;t.id=m.header("call-id");t.method=m.method();t.seq=m.cseqNumber();String via=m.header("via");t.branch=via.substring(via.indexOf("branch=")+7).split(";",2)[0];long now=System.nanoTime()/1_000_000;t.next=now+500;t.until=now+32000;if(pending.size()<16)pending.add(t);send(request);}
@@ -233,10 +233,10 @@ public final class NativeSipClient {
     private boolean dialogMatches(SipMessage m,Dialog d){String from=d.outgoing?d.to:d.from,to=d.outgoing?d.from:d.to;return tag(from).equals(tag(m.header("from")))&&tag(to).equals(tag(m.header("to")));}
     private String tag(String value){if(value==null)return "";int p=value.indexOf(";tag=");return p<0?"":value.substring(p+5).split("[;\\s]",2)[0];}
     private String contact(String value){if(value==null||value.indexOf('\r')>=0||value.indexOf('\n')>=0)return null;int a=value.indexOf('<'),b=value.indexOf('>');String uri=a>=0&&b>a?value.substring(a+1,b):value.split(";",2)[0].trim();return uri.matches("sip:[a-zA-Z0-9_.!~*'()%+@;=:-]+")?uri:null;}
-    private String headers(String method,String uri,String branch,String from,String to,String id,int seq){return method+" "+uri+" SIP/2.0\r\nVia: SIP/2.0/UDP "+local.getHostAddress()+":"+cfg.localPort+";branch="+branch+";rport\r\nMax-Forwards: 70\r\nFrom: "+from+"\r\nTo: "+to+"\r\nCall-ID: "+id+"\r\nCSeq: "+seq+" "+method+"\r\nContact: <sip:"+cfg.user+"@"+local.getHostAddress()+":"+cfg.localPort+">\r\nAllow: INVITE, ACK, CANCEL, BYE, OPTIONS\r\nUser-Agent: Kiosk-SIP-Native-Lab\r\n";}
+    private String headers(String method,String uri,String branch,String from,String to,String id,int seq){return method+" "+uri+" SIP/2.0\r\nVia: SIP/2.0/UDP "+local.getHostAddress()+":"+cfg.localPort+";branch="+branch+";rport\r\nMax-Forwards: 70\r\nFrom: "+from+"\r\nTo: "+to+"\r\nCall-ID: "+id+"\r\nCSeq: "+seq+" "+method+"\r\nContact: <sip:"+cfg.user+"@"+local.getHostAddress()+":"+cfg.localPort+">\r\nAllow: INVITE, ACK, CANCEL, BYE, OPTIONS\r\nUser-Agent: SIP-Phone-for-Kiosk-Satellite\r\n";}
     private String reply(SipMessage m,int code,String reason,String to,String sdp){StringBuilder out=new StringBuilder("SIP/2.0 "+code+" "+reason+"\r\n");for(String via:m.all("via"))out.append("Via: ").append(via).append("\r\n");out.append("From: ").append(m.header("from")).append("\r\nTo: ").append(to).append("\r\nCall-ID: ").append(m.header("call-id")).append("\r\nCSeq: ").append(m.header("cseq")).append("\r\nContact: <sip:").append(cfg.user).append('@').append(local.getHostAddress()).append(':').append(cfg.localPort).append(">\r\n");return out+body(sdp);}
     private String body(String sdp){return (sdp.isEmpty()?"":"Content-Type: application/sdp\r\n")+"Content-Length: "+sdp.getBytes(StandardCharsets.UTF_8).length+"\r\n\r\n"+sdp;}
-    private String auth(SipMessage challenge,String method,String uri){String value=challenge.header(challenge.status()==407?"proxy-authenticate":"www-authenticate");if(value==null||!value.startsWith("Digest "))throw new IllegalArgumentException("Digest challenge fehlt");Map<String,String> p=SipDigest.parseParams(value);String realm=p.get("realm"),nonce=p.get("nonce"),qop=null;if(realm==null||nonce==null||!p.getOrDefault("algorithm","MD5").equalsIgnoreCase("MD5"))throw new IllegalArgumentException("Nicht unterstützte SIP-Anmeldung");if(p.containsKey("qop")){for(String q:p.get("qop").split(","))if(q.trim().equals("auth"))qop="auth";if(qop==null)throw new IllegalArgumentException("qop nicht unterstützt");}String cnonce=id(),nc="00000001";String result=(challenge.status()==407?"Proxy-Authorization":"Authorization")+": Digest username=\""+cfg.user+"\", realm=\""+quote(realm)+"\", nonce=\""+quote(nonce)+"\", uri=\""+uri+"\", response=\""+SipDigest.response(cfg.user,realm,cfg.password,method,uri,nonce,qop,nc,cnonce)+"\", algorithm=MD5";if(qop!=null)result+=", qop=auth, nc="+nc+", cnonce=\""+cnonce+"\"";if(p.containsKey("opaque"))result+=", opaque=\""+quote(p.get("opaque"))+"\"";return result+"\r\n";}
+    private String auth(SipMessage challenge,String method,String uri){String value=challenge.header(challenge.status()==407?"proxy-authenticate":"www-authenticate");if(value==null||!value.startsWith("Digest "))throw new IllegalArgumentException("Missing Digest challenge");Map<String,String> p=SipDigest.parseParams(value);String realm=p.get("realm"),nonce=p.get("nonce"),qop=null;if(realm==null||nonce==null||!p.getOrDefault("algorithm","MD5").equalsIgnoreCase("MD5"))throw new IllegalArgumentException("Unsupported SIP authentication");if(p.containsKey("qop")){for(String q:p.get("qop").split(","))if(q.trim().equals("auth"))qop="auth";if(qop==null)throw new IllegalArgumentException("Unsupported qop");}String cnonce=id(),nc="00000001";String result=(challenge.status()==407?"Proxy-Authorization":"Authorization")+": Digest username=\""+cfg.user+"\", realm=\""+quote(realm)+"\", nonce=\""+quote(nonce)+"\", uri=\""+uri+"\", response=\""+SipDigest.response(cfg.user,realm,cfg.password,method,uri,nonce,qop,nc,cnonce)+"\", algorithm=MD5";if(qop!=null)result+=", qop=auth, nc="+nc+", cnonce=\""+cnonce+"\"";if(p.containsKey("opaque"))result+=", opaque=\""+quote(p.get("opaque"))+"\"";return result+"\r\n";}
     private String quote(String value){return value.replace("\\","\\\\").replace("\"","\\\"").replace("\r","").replace("\n","");}
     private void send(String message)throws Exception {byte[] bytes=message.getBytes(StandardCharsets.UTF_8);socket.send(new DatagramPacket(bytes,bytes.length,target));}
     private String id(){byte[] bytes=new byte[12];random.nextBytes(bytes);StringBuilder s=new StringBuilder();for(byte b:bytes)s.append(String.format("%02x",b&255));return s.toString();}

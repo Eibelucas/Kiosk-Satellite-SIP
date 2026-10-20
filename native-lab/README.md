@@ -27,7 +27,9 @@ The plugin sends G.711 audio over RTP between Android and Asterisk. Capture and 
 
 The PCM queue holds at most 480 samples, or 60 ms at 8 kHz. When a backlog develops, older frames are dropped. Duplicate and late RTP sequences are not replayed. The requested Android playback buffer is 320 frames, or 40 ms; Android may enforce a larger minimum.
 
-These values describe local buffering, not total call latency. A measured comparison on Android devices is not yet available. An adaptive jitter buffer and a shared audio lease with KS/Voice Satellite are not implemented.
+These values describe local buffering, not total call latency. A measured comparison on Android devices is not yet available. An adaptive jitter buffer and a shared audio lease with KS/Voice Satellite are not implemented. Before a user places or answers a call, WakeWordGuard reads and preserves the mute state, requests temporary muting, and waits for listening to stop. It restores the previous state after normal completion, cancellation, or failure, including cancellation while a mute callback is pending. Ringing alone does not acquire this guard. A host that cannot release capture requires manually paused wake word. Stop cannot restore state because KS revokes the session first; the README documents the recovery.
+
+AndroidG711 accepts an SDP RTP address only when it equals the PBX address already resolved by NativeSipClient. Its UDP socket is connected to that negotiated PBX endpoint, and receive checks also enforce the address and port. A private address alone is insufficient. The phone therefore requires the PBX to anchor media.
 
 ## Automated checks
 
@@ -38,6 +40,9 @@ These values describe local buffering, not total call latency. A measured compar
 - UDP retransmissions and rejection of responses from foreign sources.
 - Independent device identities and call state.
 - G.711 conversion, SDP, and resource cleanup after media failures.
+- Wake word mute ownership, prior-muted and disabled states, delayed callbacks, cancellation, failure, bounded polling, and session revocation.
+- Rejection of SDP media redirection to other private, public, or loopback addresses, including an outgoing call response before simulated capture starts.
+- English defaults and the optional German UI.
 - Bounded audio queues during playback stalls, variable packet sizes, duplicates, and sequence wraparound.
 
 Add-on CI also tests configuration and API behavior, plus real Asterisk instances with multiple local test devices, ring groups, and the audio bridge. Tests use fictional credentials. These checks do not measure Android audio quality or end-to-end latency over a provider connection.

@@ -19,6 +19,7 @@ Versions use the year.month.update format, for example `26.10.1`. Git tags inclu
 | [26.10.13](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.13) | Native SIP calls, multiple devices, ring groups, compact call view, and bounded audio buffering |
 | [26.10.14](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.14) | Plugin icon, installation badge, and installation instructions |
 | [26.10.15](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.15) | Correct manifest icon resolution relative to the assets directory |
+| [26.10.16](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.16) | Wake word mute coordination, PBX-only RTP, English/German UI, and clearer plugin name |
 
 ## Installing and updating
 
@@ -62,6 +63,6 @@ These checks use fictional credentials and local test servers. Real provider com
 
 ## Remaining limitations
 
-The regular plugin uses native SIP audio with a separate device extension and manual acceptance of incoming calls. Shared microphone coordination with KS/Voice Satellite and measured latency comparisons remain open.
+The regular plugin uses native SIP audio with a separate device extension and manual acceptance of incoming calls. Wake word is temporarily muted for calls and restored afterward; hosts that do not release capture require manually paused wake word. A shared microphone lease and measured latency comparisons remain open. See the [microphone limitations](README.md#scope-and-limitations).
 
 The alternative web phone page uses a SIP phone or the audio bridge to one configured Kiosk Satellite intercom device. The bridge uses local HTTP/WebSocket connections and does not support TLS intercom. Kiosk cards are web contact entries. TLS/SRTP, IP-authenticated trunks, and shared trunk registrations for multiple direct-dial numbers are not complete supported profiles.
