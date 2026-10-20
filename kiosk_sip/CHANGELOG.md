@@ -1,3 +1,9 @@
+# 26.10.14
+
+- Add a 256 × 256 plugin icon to the manifest and release package.
+- Add the official Install in Kiosk Satellite badge and installation instructions.
+- Verify the packaged icon's size, dimensions, and source bytes before publishing.
+
 # 26.10.13
 
 - Native SIP dialer with a floating phone button and direct outgoing call setup.

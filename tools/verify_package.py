@@ -21,7 +21,17 @@ else:
 package = dist / f"{manifest['id']}-{manifest['version']}.zip"
 assert package.stat().st_size <= 4 * 1024 * 1024
 with zipfile.ZipFile(package) as archive:
-    assert set(archive.namelist()) == {'kiosk-satellite-plugin.json','plugin.jar','LICENSE'}
+    expected = {'kiosk-satellite-plugin.json', 'plugin.jar', 'LICENSE'}
+    if manifest.get('icon'):
+        expected.add(manifest['icon'])
+        icon_bytes = archive.read(manifest['icon'])
+        assert icon_bytes == (root / manifest['icon']).read_bytes()
+        assert len(icon_bytes) <= 256 * 1024
+        assert icon_bytes[:16] == b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
+        assert int.from_bytes(icon_bytes[16:20], 'big') == 256
+        assert int.from_bytes(icon_bytes[20:24], 'big') == 256
+    assert len(archive.namelist()) == len(expected)
+    assert set(archive.namelist()) == expected
     assert archive.read('kiosk-satellite-plugin.json') == manifest_bytes
     assert archive.read('LICENSE') == (root / 'LICENSE').read_bytes()
     with zipfile.ZipFile(io.BytesIO(archive.read('plugin.jar'))) as jar:
@@ -29,4 +39,4 @@ with zipfile.ZipFile(package) as archive:
         assert jar.read('classes.dex').startswith(b'dex\n')
 digest = hashlib.sha256(package.read_bytes()).hexdigest()
 assert (dist / (package.name+'.sha256')).read_text() == f'{digest}  {package.name}\n'
-print(f'PASS: version {manifest["version"]}, ZIP root, identical manifests, DEX, LICENSE and SHA-256.')
+print(f'PASS: version {manifest["version"]}, ZIP root, identical manifests, DEX, LICENSE, icon and SHA-256.')

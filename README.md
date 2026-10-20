@@ -20,20 +20,34 @@ Each kiosk can use its own SIP extension: a local device identity on the server.
 
 Provider profiles are included for Telekom residential service, sipgate, easybell, and FRITZ!Box. Other registering SIP accounts can use manual profiles.
 
-## Installation and setup
+## Installation
 
-Use the same repository URL for the Home Assistant app store and the Kiosk Satellite plugin manager:
+### Install in Kiosk Satellite
+
+Use the button below to open the plugin in Kiosk Satellite, review its details, and select **Trust and install**.
+
+[![Install in Kiosk Satellite](https://kiosksatellite.com/img/badges/plugin-add.svg)](https://kiosksatellite.com/redirect/plugin/?repository=Eibelucas/Kiosk-Satellite-SIP)
+
+### Manual installation
+
+1. Open **Settings → Plugin Manager** in Kiosk Satellite and turn on **Enable Plugins**.
+2. Select **Add plugin**, enter the repository URL below, and select **Preview**.
+3. Review the plugin details and select **Trust and install**.
 
 ```text
 https://github.com/Eibelucas/Kiosk-Satellite-SIP
 ```
+
+## Gateway and SIP setup
+
+Add the same repository URL to the Home Assistant app store and configure the gateway before making calls.
 
 The plugin and setup assistant currently use German labels. Their exact wording appears in parentheses where needed.
 
 1. In Home Assistant, open **Settings → Apps/Add-ons → Store → Repositories** and add the repository. Install and start **Kiosk Satellite SIP Gateway**.
 2. Select **Open Web UI** and configure the provider, phone number, and local network. Select a default outgoing number (**Standardrufnummer für ausgehende Anrufe**).
 3. Set the audio target to **SIP phone / Softphone 100** (**SIP-Telefon / Softphone 100**). For one device, configure extension 100 and its password. For multiple devices, add separate extensions from 101 to 199, each with its own password, under **Mehrere native Kiosks / SIP-Geräte**.
-4. Install and enable **Kiosk Satellite SIP** in the Kiosk Satellite plugin manager.
+4. Enable the installed **Kiosk Satellite SIP** plugin in the Kiosk Satellite plugin manager.
 5. Enter the connection details in the plugin:
 
 | Plugin setting | Value |
