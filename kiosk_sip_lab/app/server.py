@@ -1,0 +1,214 @@
+import hmac
+import json
+import secrets
+import threading
+import time
+from datetime import timedelta
+
+from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash
+
+from configuration import DESTINATION
+from providers import PROVIDERS
+
+
+class IngressOnly:
+    """Trust the source socket, never a client-provided ingress/X-Forwarded header."""
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        if environ.get("REMOTE_ADDR") != "172.30.32.2":
+            start_response("403 Forbidden", [("Content-Type", "text/plain")])
+            return [b"Only Home Assistant Ingress can access this port."]
+        environ["kiosk.ingress"] = True
+        return self.app(environ, start_response)
+
+
+class LanOnly:
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        environ["kiosk.ingress"] = False
+        return self.app(environ, start_response)
+
+
+def create_app(settings, pbx, gateway_port=8088, ingress_port=8099):
+    app = Flask(__name__)
+    app.secret_key = settings.session_secret
+    app.config.update(MAX_CONTENT_LENGTH=65536, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_NAME="kiosk_sip_session",
+                      SESSION_COOKIE_SAMESITE="Strict", PERMANENT_SESSION_LIFETIME=timedelta(hours=12))
+    # The LAN listener is HTTP inside the private network. Set up TLS in a
+    # reverse proxy if used beyond that network; never expose it to the WAN.
+    attempts = {}
+    attempts_lock = threading.Lock()
+    save_lock = threading.Lock()
+    call_lock = threading.Lock()
+    last_call = [0.0]
+
+    def ingress():
+        return request.environ.get("kiosk.ingress") is True
+
+    def csrf_token():
+        if "csrf" not in session:
+            session["csrf"] = secrets.token_urlsafe(32)
+        return session["csrf"]
+
+    def auth_revision():
+        import hashlib
+        value = settings.value["web_username"] + ":" + settings.value["web_password_hash"]
+        return hashlib.sha256(value.encode()).hexdigest()
+
+    @app.before_request
+    def authorize():
+        admin = request.path == "/setup" or request.path.startswith("/api/setup")
+        if admin and not ingress():
+            abort(403)
+        if not ingress():
+            if not settings.value["lan_enabled"]:
+                abort(403)
+            if request.endpoint not in {"login", "static"} and session.get("auth_revision") != auth_revision():
+                if request.path.startswith("/api/"):
+                    return jsonify(ok=False, error="Bitte an der Telefonseite anmelden."), 401
+                return redirect(url_for("login"))
+        if request.method in {"POST", "PUT", "DELETE"}:
+            # Session token required for HA ingress and LAN, including login.
+            token = request.headers.get("X-CSRF-Token") or request.form.get("csrf", "")
+            expected = session.get("csrf", "")
+            if not expected or not hmac.compare_digest(expected.encode(), token.encode()):
+                return jsonify(ok=False, error="Sitzung abgelaufen. Seite neu laden."), 403
+
+    @app.after_request
+    def headers(response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; form-action 'self'; base-uri 'none'"
+        return response
+
+    @app.context_processor
+    def template_context():
+        return {"csrf": csrf_token(), "is_ingress": ingress()}
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if ingress():
+            return redirect("./")
+        error = ""
+        if request.method == "POST":
+            remote = request.remote_addr
+            now = time.monotonic()
+            with attempts_lock:
+                attempts.update({key: [t for t in times if now - t < 300] for key, times in list(attempts.items())})
+                for key in [key for key, times in attempts.items() if not times]:
+                    del attempts[key]
+                if len(attempts.get(remote, [])) >= 8:
+                    return render_template("login.html", error="Zu viele Versuche. Bitte fünf Minuten warten."), 429
+                # Bound memory as well as per-IP attempts.
+                if len(attempts) >= 1024 and remote not in attempts:
+                    return render_template("login.html", error="Bitte später erneut anmelden."), 429
+                attempts.setdefault(remote, []).append(now)
+            user, password = request.form.get("username", ""), request.form.get("password", "")
+            if hmac.compare_digest(user.encode(), settings.value["web_username"].encode()) and check_password_hash(settings.value["web_password_hash"], password):
+                session.clear()
+                session["auth_revision"] = auth_revision()
+                session.permanent = True
+                with attempts_lock:
+                    attempts.pop(remote, None)
+                return redirect("./")
+            error = "Benutzername oder Passwort stimmt nicht."
+        return render_template("login.html", error=error)
+
+    @app.get("/")
+    def index():
+        if ingress() and not (settings.value["phone_password"] or any(d["enabled"] for d in settings.value.get("devices", [])) or (settings.value.get("audio_target") == "kiosk" and settings.value.get("intercom_key"))):
+            return redirect("setup")
+        return render_template("phone.html")
+
+    @app.get("/setup")
+    def setup():
+        return render_template("setup.html")
+
+    @app.get("/api/setup")
+    def get_setup():
+        return jsonify(config=settings.public(), providers=PROVIDERS, gateway_port=gateway_port,
+                       gateway_url=f"http://{settings.value['listen_address']}:{gateway_port}/",
+                       csrf=csrf_token())
+
+    @app.post("/api/setup")
+    def save_setup():
+        body = request.get_json(silent=True)
+        try:
+            with save_lock:
+                if isinstance(body, dict) and body.get("sip_port", settings.value["sip_port"]) in (gateway_port, ingress_port):
+                    raise ValueError("SIP-Port und Web-Port müssen unterschiedlich sein.")
+                if isinstance(body, dict) and body.get("audio_target", settings.value.get("audio_target")) == "kiosk" and body.get("intercom_port", settings.value.get("intercom_port")) in (gateway_port, ingress_port):
+                    raise ValueError("Kiosk-Rückrufport und Web-Port müssen unterschiedlich sein.")
+                settings.save(body)
+                pbx.restart()
+            return jsonify(ok=True, message="Gespeichert. Asterisk wurde neu gestartet. LAN-Zugriff bei Bedarf nach einem Add-on-Neustart aktivieren.")
+        except ValueError as exc:
+            return jsonify(ok=False, error=str(exc)), 400
+        except (OSError, RuntimeError):
+            error = getattr(pbx, "last_error", "") or "Asterisk konnte nicht neu starten. Add-on-Protokoll prüfen."
+            return jsonify(ok=False, error="Konfiguration gespeichert. " + error), 503
+
+    @app.get("/api/status")
+    def status():
+        return jsonify(ok=True, **pbx.status(), configured=bool(settings.value["phone_password"] or any(d["enabled"] for d in settings.value.get("devices", [])) or (settings.value.get("audio_target") == "kiosk" and settings.value.get("intercom_key"))),
+                       enabled=settings.value["enabled"], lan_enabled=settings.value["lan_enabled"],
+                       lan_error=app.config.get("LAN_ERROR", ""))
+
+    @app.get("/api/contacts")
+    def contacts():
+        return jsonify(settings.value["contacts"])
+
+    @app.post("/api/call")
+    def call():
+        body = request.get_json(silent=True)
+        number = body.get("number", "") if isinstance(body, dict) else ""
+        line_id = body.get("line", settings.value.get("outbound_line", "main")) if isinstance(body, dict) else ""
+
+        if not isinstance(number, str) or not DESTINATION.fullmatch(number):
+            return jsonify(ok=False, error="Ungültige Telefonnummer."), 400
+        state = pbx.status()
+        line = next((line for line in state.get("lines", []) if line["id"] == line_id), None)
+        if not line or not line["enabled"] or line["incoming_mode"] != "normal":
+            return jsonify(ok=False, error="Eine aktive normale Rufnummer auswählen."), 400
+        if not line["registered"]:
+            return jsonify(ok=False, error="Der SIP-Anbieter ist noch nicht registriert. Einrichtung und Status prüfen."), 409
+        if not state["phone_registered"] and not state.get("media_bridge"):
+            return jsonify(ok=False, error="SIP-Telefon 100 anmelden. Der Kiosk selbst hat noch keine Audio-Bridge."), 409
+        with call_lock:
+            now = time.monotonic()
+            if now - last_call[0] < 5:
+                return jsonify(ok=False, error="Ein Rückruf wurde gerade angefordert. Bitte kurz warten."), 429
+            last_call[0] = now
+        try:
+            return jsonify(ok=True, **pbx.originate(number, line_id))
+        except (OSError, RuntimeError):
+            return jsonify(ok=False, error="Asterisk hat den Rückruf nicht angenommen. Add-on-Protokoll prüfen."), 502
+
+    @app.post("/api/intercom/probe")
+    def probe_intercom():
+        try:
+            return jsonify(ok=True, **pbx.probe_intercom())
+        except RuntimeError as exc:
+            return jsonify(ok=False, error=str(exc)), 409
+
+    @app.post("/api/intercom/test")
+    def test_intercom():
+        if not pbx.status().get("media_bridge"):
+            return jsonify(ok=False, error="Kiosk-Audio zuerst einrichten und speichern."), 409
+        with call_lock:
+            now = time.monotonic()
+            if now - last_call[0] < 5:
+                return jsonify(ok=False, error="Ein Test/Anruf wurde gerade angefordert."), 429
+            last_call[0] = now
+        try:
+            return jsonify(ok=True, **pbx.originate("600", local_test=True))
+        except (OSError, RuntimeError, ValueError):
+            return jsonify(ok=False, error="Lokaler Echo-Test konnte nicht starten. Eine aktive normale Rufnummer auswählen und Audio-Status prüfen."), 409
+
+    return app
