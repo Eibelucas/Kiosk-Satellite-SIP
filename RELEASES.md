@@ -20,6 +20,8 @@ Versionen folgen dem gewünschten Format Jahr.Monat.Update, z. B. `26.10.1`. Die
 
 | Anruferanzeige | [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Eingehende Nummer am Kiosk, Nummernunterdrückung beachten |
 
+| Nativer Dialer | [26.10.13](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.13) | Direkte native SIP-Anrufe, mehrere Geräte, Klingelgruppen, kompakte Gesprächsansicht und begrenzter Audiopuffer |
+
 ## Installieren und aktualisieren
 
 Repository-URL für **Kiosk Satellite → Plugin-Manager → Repository hinzufügen**:
@@ -29,6 +31,8 @@ https://github.com/Eibelucas/Kiosk-Satellite-SIP
 ```
 
 Für **Home Assistant → Apps/Add-ons → Store → Repositories** dieselbe URL. Dort **Kiosk Satellite SIP Gateway** installieren, starten und die Weboberfläche öffnen. Die gesamte Einrichtung einschließlich Zugangsdaten erfolgt lokal dort. [Anleitung](kiosk_sip/DOCS.md).
+
+Ab 26.10.13 ersetzt das reguläre Plugin den bisherigen Web-Telefonstarter. Einmalig HAOS-IP, SIP-Port, eigene Nebenstelle und lokales Geräte-SIP-Passwort eintragen. Ein installiertes Lab-Plugin vorher deaktivieren. [Migration](README.md#update-von-261012-oder-vom-lab).
 
 Die Releases sind öffentlich, stabil, kein Draft und kein Pre-Release. Der Workflow `build-plugin.yml` reagiert auf `release: published`, baut den getaggten Quellstand und lädt drei Dateien als `github-actions[bot]` hoch:
 
@@ -60,4 +64,4 @@ Dabei werden ausschließlich fiktive Zugangsdaten und lokale Testserver verwende
 
 ## Verbleibende Grenze
 
-Audio geht wahlweise über SIP-Telefon **100** oder die native Audio-Brücke zu einem konfigurierten Kiosk Satellite Intercom. Kiosk-Audio verwendet derzeit lokale HTTP/WS-Verbindungen; TLS-Intercom wird abgewiesen und bleibt unverändert. Kiosk-Karten sind die Darstellung von Kontakten im Anrufpad, keine automatisch registrierten nativen Intercom-Peers. TLS/SRTP, reine IP-authentifizierte Trunks und gemeinsame Trunk-Registrierungen für mehrere Durchwahlen sind keine fertigen Profile.
+Das reguläre Plugin verwendet direktes natives SIP-Audio mit einer eigenen Nebenstelle und manueller Annahme eingehender Anrufe. Mikrofonkoordination mit KS/Voice Satellite und eine gemessene Latenzverbesserung bleiben offen. Die alternative Web-Telefonseite nutzt wahlweise SIP-Telefon **100** oder die native Audio-Brücke zu einem konfigurierten Kiosk Satellite Intercom. Kiosk-Audio verwendet derzeit lokale HTTP/WS-Verbindungen; TLS-Intercom wird abgewiesen und bleibt unverändert. Kiosk-Karten sind die Darstellung von Kontakten im Anrufpad, keine automatisch registrierten nativen Intercom-Peers. TLS/SRTP, reine IP-authentifizierte Trunks und gemeinsame Trunk-Registrierungen für mehrere Durchwahlen sind keine fertigen Profile.

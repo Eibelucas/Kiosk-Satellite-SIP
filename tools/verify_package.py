@@ -16,6 +16,8 @@ validate_manifest(manifest)
 assert re.fullmatch(r'\d+\.\d+\.\d+(?:-lab\.\d+)?', manifest['version'])
 if '-lab.' in manifest['version']:
     assert manifest['id'] == 'kiosk-satellite-sip-native-lab'
+else:
+    assert manifest['id'] == 'kiosk-satellite-sip'
 package = dist / f"{manifest['id']}-{manifest['version']}.zip"
 assert package.stat().st_size <= 4 * 1024 * 1024
 with zipfile.ZipFile(package) as archive:

@@ -1,130 +1,49 @@
 # Kiosk Satellite SIP
 
-> **Entwicklungszweig `native-dialer-lab`:** Dieser Branch baut das separate experimentelle Plugin **SIP Native Dialer Lab** mit schwebendem Telefonknopf, nativem Dialer und direkten SIP-Anrufen ohne Rückruf-Annahme. **[Versuch, Installation, Prüfungen und offene Grenzen](native-lab/README.md)**. Der folgende Text beschreibt die bisherige stabile Variante.
+Ab **26.10.13** öffnet ein schwebender Telefonknopf einen nativen Android-Dialer im KS-Design. Ausgehende Anrufe laufen direkt per SIP über deinen Asterisk zum Anbieter: **Anrufen** benötigt keine zusätzliche Annahme am eigenen Kiosk. Eingehende Anrufe bleiben manuell anzunehmen.
 
-Telefonseite ab **26.10.11**: **Telefon öffnen** startet mit den Wähltasten. **Kontakte öffnen** öffnet direkt Kontakte und Favoriten im Plugin. Ein Kontakt trägt die Nummer ein; erst **Anrufen** mit Bestätigung fordert den Anruf an. Die native KS-Gegensprechliste enthält weiterhin Kiosk-Geräte. SDK 1 hat keine Schnittstelle zum Eintragen von SIP-Telefonkontakten; dafür ist eine Änderung an Kiosk Satellite erforderlich.
+- Telefonknopf mit einstellbarer Seite und Abstand zur Navbar; antippen zum Ausklappen.
+- Gesprächsansicht mit einer Zielnummer, Verbindungsstatus, Dauer, Stumm und Auflegen. Einklappen lässt das Gespräch bestehen.
+- Getrennte Nebenstellen für mehrere Kiosks und Klingelgruppen je externer Rufnummer. Nimmt ein Kiosk an, hören die anderen auf zu klingeln.
+- RTP-Empfang und Wiedergabe arbeiten getrennt; die PCM-Warteschlange ist auf 60 ms begrenzt. Android erhält kleinere Pufferanforderungen. Die tatsächliche Ende-zu-Ende-Latenz hängt weiterhin vom Gerät und der Verbindung ab.
+- Interne Kiosk-Anrufe übernimmt weiterhin KS-Intercom.
 
-## Auf deinem HAOS installieren
+## Installieren
 
-Für **HAOS auf einem unterstützten amd64-System** gibt es jetzt ein gemeinsames Add-on mit **Asterisk, Telefon-Gateway und deutschem Anbieter-Onboarding**.
-
-1. HA → Einstellungen → Apps/Add-ons → Store → Drei-Punkte-Menü → Repositories.
-2. `https://github.com/Eibelucas/Kiosk-Satellite-SIP` hinzufügen.
-3. **Kiosk Satellite SIP Gateway** installieren und starten.
-4. **Weboberfläche öffnen** und die vier Einrichtungsschritte durchgehen.
-5. Das gewählte Audio-Ziel einrichten: für **Kiosk Satellite Intercom** Kiosk-IP, Identitätsport und gemeinsamen Intercom-Schlüssel hinterlegen; für **SIP-Telefon 100** das SIP-Telefon anmelden. Im Kiosk-Plugin die angezeigte **Gateway URL** setzen. Kiosk-Audio benötigt keine zusätzliche Anmeldung von Telefon 100.
-
-Für den ersten Audio-Test den **lokalen Kiosk-Echo-Test** im HA-Assistenten verwenden. **600 im normalen Anrufpad ist kein sicherer lokaler Test:** Das Anrufpad verwendet den ausgehenden Anbieter-Kontext.
-
-**[Vollständige Anleitung: Anbieter, mehrere Rufnummern und Durchsagen](kiosk_sip/DOCS.md)**. Sie steht auch im Dokumentations-Tab des Add-ons.
-
-Für den Plugin-Manager und den HAOS-Add-on-Store dieselbe normale Repository-URL verwenden:
+Für Plugin-Manager und HAOS-App-Store dieselbe Repository-URL verwenden:
 
 ```text
 https://github.com/Eibelucas/Kiosk-Satellite-SIP
 ```
 
-**Aktueller Umfang:** Deutsches Onboarding für Telekom, sipgate, easybell, FRITZ!Box und manuelle Profile für Vodafone, 1&1, o2 bzw. andere registrierende SIP-Konten. Bis zu acht Rufnummern, eine normale Hauptrufnummer und separate Durchsage-Nummern mit erlaubten Absendern, optionaler PIN und begrenzter Dauer. Kontakte können als Kiosk-/Raumkarten mit Favoriten und Suche angezeigt werden.
+1. HA → Einstellungen → Apps/Add-ons → Store → Repositories: URL hinzufügen. **Kiosk Satellite SIP Gateway** auf einem unterstützten amd64-System installieren oder aktualisieren und starten.
+2. **Weboberfläche öffnen**: SIP-Anbieter, Anschluss und Heimnetz einrichten. Unter **Standardrufnummer für ausgehende Anrufe** deine gewünschte Hauptrufnummer auswählen.
+3. Für den nativen Dialer **SIP-Telefon / Softphone 100** als Audio-Ziel wählen. Ein lokales Geräte-SIP-Passwort für Telefon 100 hinterlegen oder unter **Mehrere native Kiosks / SIP-Geräte** eigene Geräte 101–199 mit jeweils anderem Passwort anlegen. Die Anbieter-Zugangsdaten bleiben im Add-on.
+4. **Kiosk Satellite SIP** im KS-Plugin-Manager aus dem Repository installieren oder aktualisieren. Erfordert eine aktuelle KS-Version mit SDK-1-Overlays und Android 7/API 24 oder höher.
+5. Im Plugin **HAOS-IP / Asterisk**, den **tatsächlichen Asterisk SIP-Port** (Vorgabe 5070), **Eigene Nebenstelle** und **SIP-Passwort dieses Geräts** setzen. IP und Port entsprechen den Werten im HA-Assistenten; keine Web- oder Remote-Admin-Ports verwenden.
+6. Für den ersten Audiotest Wake Word und andere Mikrofonaufnahmen pausieren. **600 im nativen Dialer** ist der lokale Asterisk-Echo-Test. Danach beidseitigen Ton, Stumm und Auflegen mit einem gewünschten externen Anruf prüfen.
 
-**Audio ab 26.10.9:** Im HA-Assistenten zwischen **Kiosk Satellite Intercom** und SIP-Telefon **100** wählen. Die native Audio-Brücke verbindet Asterisk mit Mikrofon/Lautsprecher und Anrufanzeige eines konfigurierten Android-Kiosks. Normale Anrufe müssen am Kiosk angenommen werden; separate Durchsagen bleiben einseitig. Ein gemeinsamer Intercom-Schlüssel und erreichbares lokales Intercom sind erforderlich. Derzeit ein Kiosk-Gerät und lokale HTTP/WS-Verbindungen; TLS-Intercom wird nicht automatisch umgestellt. Kiosk-Karten bleiben zugeordnete Telefonkontakte. Das Plugin öffnet die Telefonseite, die Audio-Brücke läuft im HA-Add-on. **[Einrichtung und lokaler Audio-Test](kiosk_sip/DOCS.md#kiosk-satellite-als-audio-ziel-ab-26109)**.
+Für mehrere Geräte das Add-on ebenfalls auf **26.10.13** aktualisieren. Das bisherige Add-on 26.10.12 bleibt für die Nebenstelle **100** verwendbar. Pro Gerät wird eine eigene Registrierung geführt. Welche Kiosks bei einer externen Rufnummer klingeln, lässt sich im HA-Assistenten auswählen; ohne Auswahl klingeln alle aktiven Geräte der Geräteliste.
 
-**Updates:** Versionen im Format `26.10.1`, `26.10.2` usw.; Git-Tags mit `v` davor. Stabile Releases enthalten Plugin-ZIP, identisches Manifest und SHA-256-Datei. Die ZIP enthält genau `kiosk-satellite-plugin.json`, `plugin.jar` und `LICENSE`. Das HAOS-Add-on wird aus dem Repository gebaut und hat eine eigene Installation: Plugin und Add-on bei neuen Versionen jeweils aktualisieren. Gespeicherte Anschlussdaten bleiben in `/data` erhalten. Die historische Version `v0.1.0` bleibt verfügbar.
+## Update von 26.10.12 oder vom Lab
 
-**[Release-Schritte und Prüfungen](RELEASES.md)**
+Die reguläre Plugin-ID bleibt **kiosk-satellite-sip**. Das Update ersetzt den alten Web-Telefonstarter durch den nativen Dialer. Die bisherige **Gateway URL** reicht dafür nicht: die vier SIP-Einstellungen aus Schritt 5 müssen einmal gesetzt werden. Geräte-SIP-Passwort, Anbieter-Passwort und Web-Passwort sind unterschiedliche Zugänge.
 
-## Historischer Standalone-Prototyp (für Entwickler)
+Das separate Plugin **SIP Native Dialer Lab** vor Aktivierung des regulären Plugins deaktivieren. Seine Einstellungen werden wegen der anderen Plugin-ID nicht automatisch übernommen. Beide Plugins mit derselben Nebenstelle gleichzeitig zu betreiben verdrängt die Registrierung und kann den lokalen SIP-Port belegen.
 
-Unofficial SIP/telephone extension for [Kiosk Satellite](https://github.com/jxlarrea/kiosk-satellite).
+Anschlussdaten, Kontakte und bestehende Add-on-Einstellungen bleiben in `/data` erhalten. Kontakte und Favoriten sind weiter über die vorhandene Web-Telefonseite verfügbar; der neue native Dialer enthält noch keine Kontaktsynchronisation. **600 in der alten Web-Telefonseite ist kein lokaler Echo-Test**, da diese Seite den ausgehenden Anbieter-Kontext verwendet.
 
-The project is split into two parts:
+## Dokumentation und Grenzen
 
-1. **Kiosk Satellite plugin** – adds a `Telefon öffnen` command and opens the configured phone UI inside Kiosk Satellite.
-2. **SIP gateway** – serves a touch-friendly dial pad/contact page and talks to Asterisk through AMI for outbound call setup.
+- [HAOS-Einrichtung, Anbieter und Durchsagen](kiosk_sip/DOCS.md)
+- [Native Implementierung und Testumfang](native-lab/README.md)
+- [Release-Verlauf und Paketprüfung](RELEASES.md)
+- [Aktuelles Release](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/latest)
 
-> The following describes the original standalone `gateway/` prototype, not the current HAOS add-on. Outbound call setup is implemented as an Asterisk AMI originate request. The bidirectional RTP ↔ Kiosk Satellite Intercom audio bridge and incoming-call injection are the next milestone.
+Der native Dialer verwendet IPv4, UDP und G.711 zu einem Asterisk im LAN. TLS/SRTP, DTMF während des Gesprächs, Halten und Vermitteln sind noch nicht umgesetzt. Die gemeinsame Mikrofonverwaltung mit KS/Voice Satellite ist offen: erkannte aktive Aufnahme oder Intercom-Sitzung blockiert den Anruf. Die neue Audiopufferung ist automatisiert getestet, ihre Wirkung auf die Sprachverzögerung muss noch am Gerät verglichen werden. Ein externer Anruf mit der vorherigen Lab-Version wurde vom Nutzer bestätigt.
 
-## Planned architecture
+Das Add-on bietet weiterhin mehrere Anbieter und bis zu acht externe SIP-Konten, die bisherige KS-Intercom-Audio-Brücke und die Web-Telefonseite. Der ursprüngliche Standalone-Prototyp liegt unter `gateway/`.
 
-```text
-Kiosk Satellite
-  └─ Kiosk Satellite SIP plugin
-       └─ Phone UI (gateway)
-            └─ Kiosk SIP Gateway
-                 └─ Asterisk
-                      └─ Telekom SIP / PSTN
-```
+## Lizenz
 
-## Current features
-
-- Kiosk Satellite SDK 1 plugin
-- Configurable gateway URL
-- `Telefon öffnen` plugin command
-- Responsive dial pad
-- Local contact list from `gateway/contacts.json`
-- Outbound Asterisk AMI `Originate`
-- Optional caller ID and dial context configuration
-- Docker image for the gateway
-- GitHub Actions plugin build/release workflow
-
-## Quick start
-
-### 1. Gateway
-
-Copy the example configuration:
-
-```bash
-cd gateway
-cp .env.example .env
-```
-
-Edit the Asterisk AMI values, then run:
-
-```bash
-pip install -r requirements.txt
-python app.py
-```
-
-The web UI defaults to `http://HOST:8088/`.
-
-### 2. Kiosk Satellite plugin
-
-Install a release ZIP from this repository in Kiosk Satellite's Plugin Manager. Configure `Gateway URL` to the URL from step 1 and run the `Telefon öffnen` command.
-
-Plugin packages follow Kiosk Satellite SDK 1 and contain `kiosk-satellite-plugin.json`, `plugin.jar`, and `LICENSE`.
-
-## Asterisk example
-
-Enable an AMI user with the minimum permissions needed for `Originate` and set a dial context that can reach your Telekom SIP trunk.
-
-Example environment values:
-
-```env
-AMI_HOST=192.168.1.20
-AMI_PORT=5038
-AMI_USERNAME=kioskphone
-AMI_SECRET=change-me
-ASTERISK_CHANNEL=PJSIP/100
-ASTERISK_CONTEXT=from-kiosk-phone
-ASTERISK_CALLER_ID=Kiosk <100>
-```
-
-For a user-entered destination number, the gateway originates the configured local channel and sends that number into the configured dialplan context.
-
-## Security
-
-Do not expose AMI to the internet. Keep the gateway and AMI on your trusted LAN/VPN, use an AMI account restricted to the required commands, and put authentication/TLS in front of the gateway before exposing it outside the LAN.
-
-## Roadmap
-
-- Incoming PSTN/SIP call → Kiosk Satellite Intercom ringing
-- Answer/decline/hangup synchronization
-- PCM16 16 kHz mono ↔ RTP media bridge
-- Multiple kiosks / ring groups
-- Call history
-- Contact editing
-- Home Assistant services/entities
-- DTMF during an active call
-
-## License
-
-Apache-2.0. Kiosk Satellite is a separate project and is not bundled here.
+Apache-2.0; [Attribution](NOTICE). Kiosk Satellite ist ein separates Projekt und wird nicht mitgeliefert.

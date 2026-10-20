@@ -1,5 +1,11 @@
 # Einrichtung auf HAOS
 
+## Nativer Dialer ab 26.10.13
+
+Der reguläre KS-Plugin-Build verwendet jetzt einen nativen SIP-Dialer statt der Gateway URL. Für diesen Weg im Audio-Schritt **SIP-Telefon / Softphone 100** wählen, Telefon 100 oder eigene Geräte 101–199 mit lokalem SIP-Passwort einrichten und eine **Standardrufnummer für ausgehende Anrufe** auswählen. Im Plugin HAOS-IP, den tatsächlichen SIP-Port, die Nebenstelle und deren Passwort eintragen. Mehrere Kiosks brauchen unterschiedliche Nebenstellen; interne Gespräche bleiben beim KS-Intercom. [Installation und Migration](../README.md).
+
+Die unten beschriebene Web-Telefonseite und Intercom-Brücke bleiben als alternative Wege verfügbar. Gateway URL und Web-Zugang betreffen die Web-Telefonseite. Die native Plugin-Anmeldung benötigt das lokale Geräte-SIP-Passwort. **600 ist nur im nativen SIP-Dialer ausdrücklich lokal**, nicht im alten Web-Anrufpad.
+
 Telefonseite ab **26.10.11**: **Telefon öffnen** startet mit den Wähltasten. **Kontakte öffnen** öffnet direkt Kontakte und Favoriten im Plugin. Ein Kontakt trägt die Nummer ein; erst **Anrufen** mit Bestätigung fordert den Anruf an. Die native KS-Gegensprechliste enthält weiterhin Kiosk-Geräte. SDK 1 hat keine Schnittstelle zum Eintragen von SIP-Telefonkontakten; dafür ist eine Änderung an Kiosk Satellite erforderlich.
 
 Für HAOS auf einem unterstützten amd64-System (amd64). Kein separates Asterisk-Add-on erforderlich: Dieses Add-on enthält Asterisk und den SIP-Gateway.

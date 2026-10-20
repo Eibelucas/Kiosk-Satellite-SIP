@@ -1,4 +1,8 @@
-# Native Dialer Lab
+# Nativer SIP-Dialer
+
+Die Entwicklung aus dem Zweig `native-dialer-lab` wird ab **26.10.13** regulär als **Kiosk Satellite SIP** veröffentlicht. Für aktuelle Installation und Migration die [Hauptanleitung](../README.md) verwenden. Das bisherige Lab-Plugin hat eine eigene ID und muss beim Wechsel deaktiviert werden.
+
+Die folgende Dokumentation beschreibt die Entwicklungsschritte und technischen Grenzen der Lab-Versionen bis Lab.5; deren ZIPs und der Entwicklungsverlauf bleiben erhalten.
 
 Dieser Entwicklungszweig erprobt ein natives Telefon in Kiosk Satellite. Er ist **kein fertiges Release**. Das HAOS-Add-on ergänzt die Geräteverwaltung; der experimentelle Plugin-Build verwendet die separate ID `kiosk-satellite-sip-native-lab` und Version `26.10.13-lab.5`.
 

@@ -1,3 +1,13 @@
+# 26.10.13
+
+- Nativer SIP-Dialer mit schwebendem Telefonknopf und direkten ausgehenden Anrufen ohne lokalen Rückruf-Annehmen-Schritt.
+- Native Gesprächsansicht mit einmaliger Zielnummer, Status, Dauer, Stumm und Auflegen; zentrierte Icons und korrekte Umlaute.
+- Getrennte SIP-Geräte 101–199 mit eigenen Passwörtern, Registrierung und Klingelgruppen je externer Rufnummer. Nebenstelle 100 bleibt kompatibel.
+- RTP-Empfang und Wiedergabe getrennt, PCM-Rückstau auf 60 ms begrenzt, kleinere Android-Puffer angefordert. Tatsächliche Sprachverzögerung bleibt geräteabhängig und ist noch vergleichend zu messen.
+- Interne Kiosk-Gespräche bleiben beim vorhandenen KS-Intercom.
+- Plugin-Update behält die bisherige ID kiosk-satellite-sip. Nach dem Wechsel von 26.10.12 einmal HAOS-IP, tatsächlichen SIP-Port, Nebenstelle und lokales Geräte-SIP-Passwort im Plugin setzen; Gateway URL ist nicht mehr die Plugin-Verbindung.
+- Das separate Lab-Plugin vor Aktivierung des regulären Plugins deaktivieren. Einstellungen zwischen den unterschiedlichen Plugin-IDs werden nicht automatisch übertragen.
+
 # 26.10.12
 
 - Eingehende Kiosk-Anrufe zeigen die vom Anbieter übermittelte Anrufernummer statt des SIP-Kontonamens wie „Hauptrufnummer“.
