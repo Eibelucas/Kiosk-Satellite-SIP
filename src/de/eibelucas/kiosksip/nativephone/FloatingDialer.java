@@ -16,7 +16,7 @@ final class FloatingDialer implements OverlayFactory {
     interface Actions { void toggle();void dial(String number);void hangup();void answer();void mute(); }
     private final DialerModel model;
     private final Actions actions;
-    private LinearLayout root, panel;
+    private LinearLayout root, panel, input, keypad;
     private ScrollView scroll;
     private Button chip,call,end,accept,mute,backspace;
     private TextView status,peer;
@@ -37,7 +37,7 @@ final class FloatingDialer implements OverlayFactory {
         Button collapse=button(context,"Schließen","mdi:chevron-down");collapse.setText("");collapse.setOnClickListener(v->actions.toggle());header.addView(collapse,new LinearLayout.LayoutParams(theme.px(48),theme.px(48)));panel.addView(header);
         status=new TextView(context);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);status.setPadding(0,theme.px(6),0,theme.px(10));panel.addView(status);
         peer=new TextView(context);panel.addView(peer);
-        LinearLayout input=new LinearLayout(context);input.setGravity(Gravity.CENTER_VERTICAL);
+        input=new LinearLayout(context);input.setGravity(Gravity.CENTER_VERTICAL);
         number=new EditText(context);number.setSingleLine(true);number.setHint("Nummer wählen");number.setInputType(InputType.TYPE_CLASS_PHONE);number.setSelectAllOnFocus(false);
         number.setShowSoftInputOnFocus(false);
         number.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(20)});
@@ -45,10 +45,11 @@ final class FloatingDialer implements OverlayFactory {
         input.addView(number,new LinearLayout.LayoutParams(0,theme.px(52),1));
         backspace=button(context,"Ziffer löschen","mdi:backspace-outline");backspace.setText("");backspace.setOnClickListener(v->{model.delete();refresh();});input.addView(backspace,new LinearLayout.LayoutParams(theme.px(48),theme.px(48)));panel.addView(input);
         String[] keys={"1","2","3","4","5","6","7","8","9","*","0","#"};
+        keypad=new LinearLayout(context);keypad.setOrientation(LinearLayout.VERTICAL);panel.addView(keypad);
         for(int row=0;row<4;row++){
             LinearLayout line=new LinearLayout(context);
             for(int col=0;col<3;col++){String digit=keys[row*3+col];Button b=button(context,digit,null);b.setOnClickListener(v->{model.digit(digit);refresh();});if(digit.equals("0")){b.setContentDescription("0, gedrückt halten für Plus");b.setOnLongClickListener(v->{model.plus();refresh();return true;});}LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,theme.px(48),1);p.setMargins(theme.px(3),theme.px(3),theme.px(3),theme.px(3));line.addView(b,p);digits.add(b);}
-            panel.addView(line);
+            keypad.addView(line);
         }
         call=button(context,"Anrufen","mdi:phone");call.setOnClickListener(v->actions.dial(number.getText().toString()));panel.addView(call,full());
         accept=button(context,"Annehmen","mdi:phone");accept.setOnClickListener(v->actions.answer());panel.addView(accept,full());
@@ -69,6 +70,8 @@ final class FloatingDialer implements OverlayFactory {
         scroll.setVisibility(model.expanded?View.VISIBLE:View.GONE);
         editing=true;if(!number.getText().toString().equals(model.number)){number.setText(model.number);number.setSelection(number.length());}editing=false;
         number.setEnabled(!model.active());backspace.setEnabled(!model.active());
+        input.setVisibility(model.active()?View.GONE:View.VISIBLE);
+        keypad.setVisibility(model.active()?View.GONE:View.VISIBLE);
         status.setText(model.label());peer.setText(model.active()?model.peer:"");peer.setVisibility(model.active()?View.VISIBLE:View.GONE);
         for(Button digit:digits)digit.setVisibility(model.active()?View.GONE:View.VISIBLE);
         call.setVisibility(model.active()?View.GONE:View.VISIBLE);call.setEnabled(model.canDial());

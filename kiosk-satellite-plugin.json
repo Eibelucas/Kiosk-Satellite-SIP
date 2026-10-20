@@ -3,10 +3,10 @@
   "apiVersion": 1,
   "id": "kiosk-satellite-sip-native-lab",
   "name": "SIP Native Dialer Lab",
-  "version": "26.10.13-lab.3",
+  "version": "26.10.13-lab.4",
   "minAndroidSdk": 24,
   "entryClass": "de.eibelucas.kiosksip.nativephone.NativePhonePlugin",
-  "description": "Nativer Telefonknopf mit ausklappbarem Dialer, direkten SIP-Anrufen und eigenen Nebenstellen fÃ¼r mehrere Kiosks.",
+  "description": "Nativer Telefonknopf mit ausklappbarem Dialer, direkten SIP-Anrufen und eigenen Nebenstellen für mehrere Kiosks.",
   "author": "Eibelucas",
   "license": "Apache-2.0",
   "capabilities": [
@@ -20,7 +20,7 @@
       "title": "HAOS-IP / Asterisk",
       "type": "string",
       "default": "",
-      "group": "GerÃ¤te-Anmeldung",
+      "group": "Geräte-Anmeldung",
       "description": "Lokale IPv4-Adresse des bestehenden HAOS-Add-ons. Keine SIP-Anbieter-Zugangsdaten."
     },
     {
@@ -28,23 +28,23 @@
       "title": "Asterisk SIP-Port",
       "type": "string",
       "default": "5070",
-      "group": "GerÃ¤te-Anmeldung"
+      "group": "Geräte-Anmeldung"
     },
     {
       "key": "extension",
       "title": "Eigene Nebenstelle",
       "type": "string",
       "default": "100",
-      "group": "GerÃ¤te-Anmeldung",
-      "description": "Pro GerÃ¤t eine andere Nummer: 101 bis 199. 100 ist die bisherige gemeinsame Nebenstelle."
+      "group": "Geräte-Anmeldung",
+      "description": "Pro Gerät eine andere Nummer: 101 bis 199. 100 ist die bisherige gemeinsame Nebenstelle."
     },
     {
       "key": "password",
-      "title": "SIP-Passwort dieses GerÃ¤ts",
+      "title": "SIP-Passwort dieses Geräts",
       "type": "secret",
       "default": "",
-      "group": "GerÃ¤te-Anmeldung",
-      "description": "Eigenes GerÃ¤te-Passwort aus der HA-Einrichtung; bei Nebenstelle 100 das bisherige Telefon-Passwort."
+      "group": "Geräte-Anmeldung",
+      "description": "Eigenes Geräte-Passwort aus der HA-Einrichtung; bei Nebenstelle 100 das bisherige Telefon-Passwort."
     },
     {
       "key": "localPort",
@@ -70,7 +70,7 @@
       "type": "string",
       "default": "88",
       "group": "Telefonknopf",
-      "description": "Platz fÃ¼r die Navbar lassen. 12 bis 300."
+      "description": "Platz für die Navbar lassen. 12 bis 300."
     }
   ],
   "commands": [
@@ -80,11 +80,11 @@
     },
     {
       "id": "openPhone",
-      "title": "Nativen Dialer Ã¶ffnen"
+      "title": "Nativen Dialer öffnen"
     },
     {
       "id": "hangup",
-      "title": "GesprÃ¤ch beenden"
+      "title": "Gespräch beenden"
     }
   ]
 }

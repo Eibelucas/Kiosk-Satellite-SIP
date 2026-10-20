@@ -39,10 +39,23 @@ public final class NativePhoneTest {
         void verifyDigest(SipMessage message,String method,String nonce){Map<String,String> p=SipDigest.parseParams(message.header("authorization"));check(p.get("username").equals(extension),"correct per-device digest user");String expected=SipDigest.response(extension,"asterisk","fake-phone-secret",method,p.get("uri"),nonce,p.get("qop"),p.get("nc"),p.get("cnonce"));check(expected.equals(p.get("response")),"correct digest response");}
     }
     public static void main(String[] args)throws Exception{
-        model();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices();
+        model();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices();
         System.out.println("Native phone: "+assertions+" assertions passed (loopback SIP + model)");
     }
     static void model(){DialerModel m=new DialerModel();check(!m.canDial(),"unregistered cannot dial");m.registered=true;m.digit("1");m.digit("0");m.digit("1");check(m.canDial(),"registered number can dial");m.update("calling","101","Verbindet");m.expanded=false;check(m.active(),"collapse preserves call");m.digit("9");check(m.number.equals("101"),"cannot edit active number");m.update("connected","","Verbunden");long time=m.connectedAt;m.update("connected","","Verbunden");check(m.connectedAt==time,"duplicate event preserves duration");m.update("idle","","Beendet");check(m.canDial(),"call can be repeated");m.delete();check(!m.canDial(),"short invalid number rejected");}
+    static void playoutQueue()throws Exception{
+        RtpPlayoutQueue q=new RtpPlayoutQueue();
+        for(int i=0;i<100;i++){byte[] pcm=new byte[320];pcm[0]=(byte)i;q.offer(i,7,pcm);check(q.queuedSamples()<=480,"stalled speaker queue stays within 60 ms");}
+        check(q.take()[0]==97,"oldest delayed speech discarded after speaker stall");
+        check(q.take()[0]==98&&q.take()[0]==99,"newest speech preserved in order");
+        q.offer(99,7,new byte[320]);q.offer(98,7,new byte[320]);check(q.queuedSamples()==0,"duplicate and reordered RTP not replayed");
+        q.offer(100,7,new byte[640]);q.offer(101,7,new byte[640]);check(q.queuedSamples()==320,"variable packet sizes obey sample budget");q.take();
+        q.offer(102,7,new byte[962]);check(q.queuedSamples()==0,"oversized audio cannot expand queue");
+        q.offer(65535,8,new byte[320]);q.offer(0,8,new byte[320]);check(q.queuedSamples()==320,"sequence wrap accepted for new RTP source");q.take();q.take();
+        boolean[] stopped={false};Thread reader=new Thread(()->{try{stopped[0]=q.take()==null;}catch(InterruptedException ignored){}});
+        reader.setDaemon(true);reader.start();q.close();reader.join(1000);check(!reader.isAlive()&&stopped[0],"close wakes blocked speaker and exits thread");
+        q.offer(1,8,new byte[320]);check(q.queuedSamples()==0,"closed queue ignores late RTP");
+    }
     static void directCall()throws Exception{try(Fixture f=new Fixture()){
         SipMessage invite=f.dial();f.send(f.response(invite,401,"Unauthorized","WWW-Authenticate: Digest realm=\"asterisk\", nonce=\"fake-invite-nonce\", algorithm=MD5, qop=\"auth\"\r\n",""));SipMessage ack=f.receive("ACK");check(ack.cseqNumber()==invite.cseqNumber(),"challenge ACK keeps cseq");check(ack.header("via").equals(invite.header("via")),"challenge ACK keeps branch");
         SipMessage authenticated=f.receive("INVITE");check(authenticated.cseqNumber()==invite.cseqNumber()+1,"authenticated INVITE increments cseq");f.verifyDigest(authenticated,"INVITE","fake-invite-nonce");

@@ -25,6 +25,7 @@ final class AndroidG711 implements NativeSipClient.Media {
     private AudioRecord recorder;
     private AudioTrack track;
     private AudioManager manager;
+    private final RtpPlayoutQueue playout=new RtpPlayoutQueue();
     private boolean focus,modeChanged,oldSpeaker;
     private int oldMode;
     private final AudioManager.OnAudioFocusChangeListener focusChanges=change->{if(change<0)close();};
@@ -74,21 +75,28 @@ final class AndroidG711 implements NativeSipClient.Media {
             int input=AudioRecord.getMinBufferSize(8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT);
             int output=AudioTrack.getMinBufferSize(8000,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT);
             if(input<=0||output<=0)throw new IllegalStateException("8 kHz audio unavailable");
-            recorder=new AudioRecord(MediaRecorder.AudioSource.MIC,8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,Math.max(input,1280));
-            track=new AudioTrack(AudioManager.STREAM_VOICE_CALL,8000,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT,Math.max(output,1280),AudioTrack.MODE_STREAM);
+            recorder=new AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION,8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,Math.max(input,640));
+            AudioTrack.Builder builder=new AudioTrack.Builder()
+                    .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                    .setAudioFormat(new AudioFormat.Builder().setSampleRate(8000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
+                    .setBufferSizeInBytes(Math.max(output,640)).setTransferMode(AudioTrack.MODE_STREAM);
+            if(android.os.Build.VERSION.SDK_INT>=26)builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY);
+            track=builder.build();
             if(recorder.getState()!=AudioRecord.STATE_INITIALIZED||track.getState()!=AudioTrack.STATE_INITIALIZED)throw new IllegalStateException("Audio not initialized");
+            track.setBufferSizeInFrames(320); // Request 40 ms; Android may enforce a higher minimum.
             recorder.startRecording();track.play();
             if(recorder.getRecordingState()!=AudioRecord.RECORDSTATE_RECORDING)throw new IllegalStateException("Microphone not recording");
-            running=true;Thread tx=new Thread(this::sendLoop,"native-rtp-tx"),rx=new Thread(this::receiveLoop,"native-rtp-rx");tx.setDaemon(true);rx.setDaemon(true);tx.start();rx.start();
+            running=true;Thread tx=new Thread(this::sendLoop,"native-rtp-tx"),rx=new Thread(this::receiveLoop,"native-rtp-rx"),speaker=new Thread(this::playLoop,"native-rtp-speaker");tx.setDaemon(true);rx.setDaemon(true);speaker.setDaemon(true);tx.start();rx.start();speaker.start();
         }catch(Exception error){close();throw error;}
     }
     public synchronized void close(){
-        if(closed)return;closed=true;running=false;rtp.close();
+        if(closed)return;closed=true;running=false;rtp.close();playout.close();
         if(recorder!=null){try{recorder.stop();}catch(Exception ignored){}recorder.release();recorder=null;}
         if(track!=null){try{track.stop();}catch(Exception ignored){}track.release();track=null;}
         if(manager!=null){if(modeChanged){manager.setSpeakerphoneOn(oldSpeaker);manager.setMode(oldMode);}if(focus)manager.abandonAudioFocus(focusChanges);}
     }
     private void sendLoop(){
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
         byte[] pcm=new byte[320],wire=new byte[172];
         try{AudioRecord capture=recorder;while(running){
             int count=capture.read(pcm,0,pcm.length);if(count<0)throw new IllegalStateException("Microphone lost");if(count<2)continue;int samples=count/2;
@@ -100,15 +108,25 @@ final class AndroidG711 implements NativeSipClient.Media {
         }}catch(Exception ignored){close();}
     }
     private void receiveLoop(){
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
         byte[] bytes=new byte[2048];
-        try{AudioTrack playback=track;while(running){
+        try{while(running){
             DatagramPacket p=new DatagramPacket(bytes,bytes.length);try{rtp.receive(p);}catch(SocketTimeoutException ignored){continue;}
             if(!p.getAddress().equals(remote.address)||p.getPort()!=remote.port||p.getLength()<13||(bytes[0]&0xc0)!=0x80||(bytes[1]&0x7f)!=remote.payload)continue;
             int header=12+4*(bytes[0]&15),size=p.getLength();
             if((bytes[0]&0x10)!=0){if(size<header+4)continue;header+=4+4*((bytes[header+2]&255)*256+(bytes[header+3]&255));}
             if((bytes[0]&0x20)!=0){int padding=bytes[size-1]&255;if(padding<1||padding>size-header)continue;size-=padding;}
-            if(size<=header)continue;
+            if(size<=header||size-header>RtpPlayoutQueue.MAX_SAMPLES)continue;
             byte[] pcm=new byte[(size-header)*2];for(int i=header;i<size;i++){short value=remote.payload==0?muToLinear(bytes[i]):aToLinear(bytes[i]);int at=(i-header)*2;pcm[at]=(byte)value;pcm[at+1]=(byte)(value>>>8);}
+            int sequence=((bytes[2]&255)<<8)|(bytes[3]&255);
+            long source=((long)(bytes[8]&255)<<24)|((long)(bytes[9]&255)<<16)|((long)(bytes[10]&255)<<8)|(bytes[11]&255);
+            playout.offer(sequence,source,pcm);
+        }}catch(Exception ignored){close();}
+    }
+    private void playLoop(){
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
+        try{AudioTrack playback=track;while(running){
+            byte[] pcm=playout.take();if(pcm==null)break;
             int at=0;while(running&&at<pcm.length){int count=playback.write(pcm,at,pcm.length-at);if(count<=0)throw new IllegalStateException("Speaker lost");at+=count;}
         }}catch(Exception ignored){close();}
     }

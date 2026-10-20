@@ -1,6 +1,14 @@
 # Native Dialer Lab
 
-Dieser Entwicklungszweig erprobt ein natives Telefon in Kiosk Satellite. Er ist **kein fertiges Release**. Das HAOS-Add-on ergänzt die Geräteverwaltung; der experimentelle Plugin-Build verwendet die separate ID `kiosk-satellite-sip-native-lab` und Version `26.10.13-lab.3`.
+Dieser Entwicklungszweig erprobt ein natives Telefon in Kiosk Satellite. Er ist **kein fertiges Release**. Das HAOS-Add-on ergänzt die Geräteverwaltung; der experimentelle Plugin-Build verwendet die separate ID `kiosk-satellite-sip-native-lab` und Version `26.10.13-lab.4`.
+
+## Lab.4: Gesprächsansicht und Audiopuffer
+
+- Beim Anrufen und während des Gesprächs verschwinden Nummerneingabe und Wähltasten vollständig. Die Zielnummer erscheint einmal in der Gesprächsansicht; nach dem Auflegen kehrt die Eingabe zurück.
+- RTP-Empfang und Lautsprecher laufen in getrennten Threads. Eine langsame Wiedergabe blockiert den Paketempfang nicht mehr. Maximal 60 ms PCM warten auf Wiedergabe; bei Rückstau werden alte Pakete verworfen. Doppelte und verspätete RTP-Sequenzen werden nicht wiedergegeben.
+- Android erhält eine 40-ms-Zielgröße für den Wiedergabepuffer und eine Anfrage nach dem schnellen Audiopfad ab Android 8. Geräte dürfen größere Mindestpuffer erzwingen. Aufnahme verwendet den Kommunikationsmodus; Audiothreads erhalten Audiopriorität.
+- Die neue Pufferlogik wird mit simuliertem Wiedergabestau, variablen Paketgrößen, Duplikaten und Sequenzüberlauf getestet. Tatsächliche Ende-zu-Ende-Latenz und mögliche Aussetzer müssen am Gerät verglichen werden. Anbieter, WLAN und Bluetooth können weitere Verzögerung verursachen.
+- Das bestehende Add-on muss dafür nicht aktualisiert werden. Im HA-Assistenten eine Standardrufnummer für ausgehende Anrufe auswählen und im Plugin den tatsächlichen SIP-Port eintragen.
 
 ## Bedienung
 
@@ -59,7 +67,7 @@ Der Build erzeugt eine Android-DEX-ZIP mit Manifest und Prüfsumme. GitHub Actio
 
 ## Offene Grenzen
 
-- Native Android-Darstellung, Mikrofon, Lautsprecher und Akustik wurden noch nicht auf dem Zielgerät geprüft. Es ist kein Android-Gerät mit dieser Sitzung verbunden.
+- Ein externer Anruf mit Lab.3 wurde vom Nutzer erfolgreich bestätigt; er meldete dabei hohe Sprachverzögerung und eine doppelte Nummernanzeige. Die Lab.4-Änderungen benötigen einen erneuten Gerätetest. Es ist kein Android-Gerät für automatisierte Audiomessungen mit dieser Sitzung verbunden.
 - Für eine dauerhafte Integration fehlt die gemeinsame Mikrofon-/Audio-Fokus-Verwaltung mit KS und Voice Satellite. Das Lab blockiert bei erkennbarer Belegung, ersetzt aber keine vom Host koordinierte Audiositzung. Diese Grenze muss vor einer Übernahme gelöst werden.
 - Ein direkt erreichbarer IPv4-Asterisk im LAN, UDP, G.711, eine eigene Nebenstelle pro Gerät und die in HA konfigurierte Hauptrufnummer. Keine SIP-Proxys mit Record-Route, TLS/SRTP, DTMF während des Gesprächs, Halten, Vermitteln oder mehrere gleichzeitige Gespräche auf demselben Kiosk.
 - Kontaktsynchronisation, Favoriten und Kontoauswahl sind noch nicht in den nativen Dialer übertragen.
