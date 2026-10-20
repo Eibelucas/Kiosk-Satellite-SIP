@@ -224,7 +224,7 @@ def migrate_legacy(cfg):
         draft["connections"].append(connection)
         number={key:copy.deepcopy(line.get(key,default)) for key,default in ANNOUNCEMENT_DEFAULTS.items()}
         number.update(id=line.get("id","main"),name=line.get("label") or "Phone number "+str(index+1),number=line["phone_number"],connection_id=connection_id,
-                      incoming_mode=line.get("incoming_mode","normal"),incoming_devices=copy.deepcopy(line.get("incoming_devices") or incoming_devices(cfg,line))))
+                      incoming_mode=line.get("incoming_mode","normal"),incoming_devices=copy.deepcopy(line.get("incoming_devices") or incoming_devices(cfg,line)))
         draft["numbers"].append(number)
     for index,device in enumerate(cfg.get("devices",[])):
         draft["devices"].append({**copy.deepcopy(device),"id":"device_"+device["extension"],"address":"","room":""})
