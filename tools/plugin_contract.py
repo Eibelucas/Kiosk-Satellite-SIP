@@ -16,8 +16,8 @@ def validate_manifest(manifest):
             raise ValueError(f'Invalid {key}')
     icon = manifest.get('icon')
     if icon is not None and (not isinstance(icon, str) or
-                             not re.fullmatch(r'assets/[a-zA-Z0-9_-]+\.png', icon)):
-        raise ValueError('Icon must be a PNG file directly under assets/')
+                             not re.fullmatch(r'[a-zA-Z0-9_-]+\.png', icon)):
+        raise ValueError('Icon must name a PNG relative to assets/')
     settings = manifest.get('settings', [])
     if not isinstance(settings, list) or len(settings) > 50:
         raise ValueError('Invalid settings')

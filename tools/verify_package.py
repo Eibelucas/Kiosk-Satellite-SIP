@@ -23,9 +23,10 @@ assert package.stat().st_size <= 4 * 1024 * 1024
 with zipfile.ZipFile(package) as archive:
     expected = {'kiosk-satellite-plugin.json', 'plugin.jar', 'LICENSE'}
     if manifest.get('icon'):
-        expected.add(manifest['icon'])
-        icon_bytes = archive.read(manifest['icon'])
-        assert icon_bytes == (root / manifest['icon']).read_bytes()
+        icon_path = 'assets/' + manifest['icon']
+        expected.add(icon_path)
+        icon_bytes = archive.read(icon_path)
+        assert icon_bytes == (root / icon_path).read_bytes()
         assert len(icon_bytes) <= 256 * 1024
         assert icon_bytes[:16] == b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
         assert int.from_bytes(icon_bytes[16:20], 'big') == 256

@@ -18,6 +18,7 @@ Versions use the year.month.update format, for example `26.10.1`. Git tags inclu
 | [26.10.12](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.12) | Incoming caller number display and caller privacy handling |
 | [26.10.13](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.13) | Native SIP calls, multiple devices, ring groups, compact call view, and bounded audio buffering |
 | [26.10.14](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.14) | Plugin icon, installation badge, and installation instructions |
+| [26.10.15](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.15) | Correct manifest icon resolution relative to the assets directory |
 
 ## Installing and updating
 
