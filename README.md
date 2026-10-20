@@ -42,18 +42,18 @@ https://github.com/Eibelucas/Kiosk-Satellite-SIP
 
 Add the same repository URL to the Home Assistant app store and configure the gateway before making calls.
 
-The plugin settings and default dialer language are English. Select **Language → Deutsch** for German call controls and status messages. The gateway setup assistant currently uses German labels, quoted below where needed.
+The plugin settings and default dialer language are English. Select **Language → Deutsch** for German call controls and status messages. The gateway administration workspace uses German labels, quoted below where needed.
 
 1. In Home Assistant, open **Settings → Apps/Add-ons → Store → Repositories** and add the repository. Install and start **Kiosk Satellite SIP Gateway**.
-2. Select **Open Web UI** and configure the provider, phone number, and local network. Select a default outgoing number (**Standardrufnummer für ausgehende Anrufe**).
-3. Set the audio target to **SIP phone / Softphone 100** (**SIP-Telefon / Softphone 100**). For one device, configure extension 100 and its password. For multiple devices, add separate extensions from 101 to 199, each with its own password, under **Mehrere native Kiosks / SIP-Geräte**.
+2. Select **Open Web UI**. Configure the provider under **SIP-Zugänge**, the external number and its ring targets under **Rufnummern**, and the server address and SIP port under **Netzwerk**. Choose the outgoing default under **Ausgehend standardmäßig**.
+3. Add devices under **Kiosks & Geräte**, using an individual extension from 101 to 199 and password for each device. Existing installations retain extension 100 and its stored password. Save the editors and select **Änderungen anwenden** to activate the configuration. Native SIP devices are the default audio target.
 4. Enable the installed **SIP Phone for Kiosk Satellite** plugin in the Kiosk Satellite plugin manager.
 5. Enter the connection details in the plugin:
 
 | Plugin setting | Value |
 | --- | --- |
 | PBX address | Local IPv4 address of the Home Assistant OS system |
-| PBX SIP port | SIP port configured in the assistant; default 5070 |
+| PBX SIP port | SIP port configured under Network; default 5070 |
 | Device extension | Configured device extension, such as 100 or 101 |
 | Device SIP password | Password assigned to that extension |
 | Local SIP port | Local signaling port on Android; default 5090 |
@@ -81,7 +81,7 @@ The project does not add an analytics or telemetry service. External calls trans
 
 ## Updates
 
-Update the plugin and Home Assistant app separately. Version 26.10.16 changes the display name to **SIP Phone for Kiosk Satellite** and adds the Language setting. The repository URL, plugin ID, SIP settings, and stored device password remain the same. Version 26.10.13 includes the native dialer and multi-device management. Add-on 26.10.12 remains compatible with one device on extension 100.
+Update the plugin and Home Assistant app separately. Add-on 26.10.17 introduces the administration workspace and migrates existing provider credentials, routing, device identities and ports automatically. Version 26.10.16 changes the display name to **SIP Phone for Kiosk Satellite** and adds the Language setting. The repository URL, plugin ID, SIP settings, and stored device password remain the same. Version 26.10.13 includes the native dialer and multi-device management. Add-on 26.10.12 remains compatible with one device on extension 100.
 
 Updating plugin 26.10.12 to 26.10.13 replaces the web phone launcher with the native dialer. Enter the SIP connection details once in the plugin. The plugin ID remains `kiosk-satellite-sip`. Existing provider and add-on settings are preserved.
 

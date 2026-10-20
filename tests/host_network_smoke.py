@@ -30,6 +30,8 @@ def main():
         threading.Thread(target=api.serve_forever, daemon=True).start()
         with open("/etc/hosts", "a") as hosts:
             hosts.write("\n127.0.0.1 supervisor\n")
+        Path("/data").mkdir(parents=True,exist_ok=True)
+        Path("/data/telekom.json").write_text(json.dumps({"enabled":True,"listen_address":"127.0.0.1","sip_port":5070}))
         process = subprocess.Popen(["/opt/venv/bin/python", "/app/run.py"], cwd="/app",
                                    env={**os.environ,"SUPERVISOR_TOKEN":"fake-test-token"},
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

@@ -4,7 +4,7 @@ RUN apk add --no-cache asterisk python3 py3-pip \
 COPY requirements.txt /tmp/requirements.txt
 RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 COPY app /app
-LABEL org.opencontainers.image.title="Kiosk Satellite SIP Gateway" \
+LABEL org.opencontainers.image.title="SIP Phone Gateway" \
       org.opencontainers.image.source="https://github.com/Eibelucas/Kiosk-Satellite-SIP" \
       org.opencontainers.image.licenses="Apache-2.0"
 WORKDIR /app
