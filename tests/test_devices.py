@@ -115,3 +115,14 @@ def test_custom_numeric_extension_round_trips_and_is_not_sent_to_provider(extens
 @pytest.mark.parametrize('extension',['','9'*80,'6a00','6000@pbx','6000\n','600'])
 def test_malformed_or_service_extension_is_rejected(extension):
     with pytest.raises(ValueError):config(devices=[device(extension)])
+
+
+def test_long_extensions_have_distinct_bounded_auth_object_names():
+    first='8'*79;second='8'*78+'9'
+    cfg=config(devices=[device(first),device(second)],phone_password='')
+    text=asterisk_files(cfg,'fake-ami-secret')['pjsip.conf']
+    import re
+    auth_ids=re.findall(r'^auth=(.+)$',text,re.M)
+    assert len(auth_ids)==2 and len(set(auth_ids))==2
+    assert all(len(name)<=79 and '['+name+']' in text for name in auth_ids)
+    assert f'username={first}\n' in text and f'username={second}\n' in text

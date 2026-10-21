@@ -1,4 +1,5 @@
 """Validated local configuration. No customer credentials belong in Git."""
+import hashlib
 import ipaddress
 import json
 import os
@@ -388,6 +389,8 @@ local_net=127.0.0.1/32
             continue
         extension = device["extension"]
         auth_id = "phone-auth" if extension == "100" else "device-" + extension + "-auth"
+        if len(auth_id) > 79:
+            auth_id = "device-" + hashlib.sha256(extension.encode("ascii")).hexdigest() + "-auth"
         pjsip += f"""
 [{extension}]
 type=endpoint
