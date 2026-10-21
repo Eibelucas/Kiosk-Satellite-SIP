@@ -6,7 +6,7 @@ import re
 import threading
 from datetime import datetime, timezone
 
-from configuration import atomic_json, secret_value, DEFAULTS, ACCOUNT_DEFAULTS, effective_lines, ACCOUNT_FIELDS, ANNOUNCEMENT_DEFAULTS, incoming_devices
+from configuration import atomic_json, secret_value, DEFAULTS, ACCOUNT_DEFAULTS, effective_lines, ACCOUNT_FIELDS, ANNOUNCEMENT_DEFAULTS, incoming_devices, valid_extension
 from providers import PROVIDERS
 
 CONNECTION_KEYS = {"id","name","provider","enabled","auth_mode","auth_username","auth_password",*ACCOUNT_DEFAULTS}
@@ -88,7 +88,7 @@ def validate_draft(body,previous):
     for raw in objects(body.get("devices",[]),DEVICE_KEYS,100,"Kiosks"):
         item={key:text(raw.get(key,""),key,80) for key in ("id","name","extension","address","room")}
         if not item["name"]: raise ValueError("Kiosk benennen.")
-        if not re.fullmatch(r"1[0-9]{2}",item["extension"]) or (item["extension"]=="100" and old_devices.get(item["id"],{}).get("extension")!="100") or item["extension"] in extensions: raise ValueError("Kiosks benötigen eindeutige Nebenstellen von 101 bis 199.")
+        if not valid_extension(item["extension"]) or (item["extension"]=="100" and old_devices.get(item["id"],{}).get("extension")!="100") or item["extension"] in extensions: raise ValueError("Kiosks benötigen eindeutige Nebenstellen mit 1 bis 79 Ziffern. 100 und 600 sind reserviert.")
         extensions.add(item["extension"])
         if item["address"]:
             try:
@@ -229,7 +229,7 @@ def migrate_legacy(cfg):
                       incoming_mode=line.get("incoming_mode","normal"),incoming_devices=copy.deepcopy(line.get("incoming_devices") or incoming_devices(cfg,line)))
         draft["numbers"].append(number)
     for index,device in enumerate(cfg.get("devices",[])):
-        draft["devices"].append({**copy.deepcopy(device),"id":"device_"+device["extension"],"address":"","room":""})
+        draft["devices"].append({**copy.deepcopy(device),"id":"device_"+str(index+1),"address":"","room":""})
     if cfg.get("phone_password"):
         draft["devices"].insert(0,{"id":"legacy_phone","name":"Telefon 100","extension":"100","password":cfg["phone_password"],"enabled":True,"address":"","room":""})
     draft["contacts"]=[{**copy.deepcopy(contact),"id":"contact_"+str(index+1)} for index,contact in enumerate(cfg.get("contacts",[]))]

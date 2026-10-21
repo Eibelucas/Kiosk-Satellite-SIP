@@ -21,6 +21,8 @@ Versions use the year.month.update format, for example `26.10.1`. Git tags inclu
 | [26.10.15](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.15) | Correct manifest icon resolution relative to the assets directory |
 | [26.10.16](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.16) | Wake word mute coordination, PBX-only RTP, English/German UI, and clearer plugin name |
 
+| [26.10.18](https://github.com/Eibelucas/Kiosk-Satellite-SIP/releases/tag/v26.10.18) | Configurable numeric SIP extensions, gateway administration workspace and preserved existing configuration |
+
 ## Installing and updating
 
 Repository URL for **Kiosk Satellite → Plugin Manager → Add plugin**:

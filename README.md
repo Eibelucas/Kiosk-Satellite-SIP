@@ -46,7 +46,7 @@ The plugin settings and default dialer language are English. Select **Language �
 
 1. In Home Assistant, open **Settings → Apps/Add-ons → Store → Repositories** and add the repository. Install and start **Kiosk Satellite SIP Gateway**.
 2. Select **Open Web UI**. Configure the provider under **SIP-Zugänge**, the external number and its ring targets under **Rufnummern**, and the server address and SIP port under **Netzwerk**. Choose the outgoing default under **Ausgehend standardmäßig**.
-3. Add devices under **Kiosks & Geräte**, using an individual extension from 101 to 199 and password for each device. Existing installations retain extension 100 and its stored password. Save the editors and select **Änderungen anwenden** to activate the configuration. Native SIP devices are the default audio target.
+3. Add devices under **Kiosks & Geräte**, using an individual numeric extension (1–79 digits) and password for each device, for example 6000 or 6299. Extension 600 is reserved for the bundled gateway echo test. Existing installations retain extension 100 and its stored password. Save the editors and select **Änderungen anwenden** to activate the configuration. Native SIP devices are the default audio target.
 4. Enable the installed **SIP Phone for Kiosk Satellite** plugin in the Kiosk Satellite plugin manager.
 5. Enter the connection details in the plugin:
 
@@ -81,7 +81,7 @@ The project does not add an analytics or telemetry service. External calls trans
 
 ## Updates
 
-Update the plugin and Home Assistant app separately. Add-on 26.10.17 introduces the administration workspace and migrates existing provider credentials, routing, device identities and ports automatically. Version 26.10.16 changes the display name to **SIP Phone for Kiosk Satellite** and adds the Language setting. The repository URL, plugin ID, SIP settings, and stored device password remain the same. Version 26.10.13 includes the native dialer and multi-device management. Add-on 26.10.12 remains compatible with one device on extension 100.
+Update the plugin and Home Assistant app separately. Version 26.10.18 supports numeric extensions beyond the original 100–199 range. Update both components when using the bundled gateway; external PBX users only need the plugin update. Add-on 26.10.17 introduces the administration workspace and migrates existing provider credentials, routing, device identities and ports automatically. Version 26.10.16 changes the display name to **SIP Phone for Kiosk Satellite** and adds the Language setting. The repository URL, plugin ID, SIP settings, and stored device password remain the same. Version 26.10.13 includes the native dialer and multi-device management. Add-on 26.10.12 remains compatible with one device on extension 100.
 
 Updating plugin 26.10.12 to 26.10.13 replaces the web phone launcher with the native dialer. Enter the SIP connection details once in the plugin. The plugin ID remains `kiosk-satellite-sip`. Existing provider and add-on settings are preserved.
 

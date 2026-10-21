@@ -1,5 +1,5 @@
 name: Kiosk Satellite SIP Gateway
-version: "26.10.17"
+version: "26.10.18"
 slug: kiosk_sip
 description: SIP accounts, phone numbers, kiosks and call routing in a dedicated administration workspace
 url: https://github.com/Eibelucas/Kiosk-Satellite-SIP

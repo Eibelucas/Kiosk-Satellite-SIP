@@ -28,7 +28,7 @@ def test_separate_endpoint_auth_and_aor_for_every_device():
         assert f'exten => {ext},1,Dial(PJSIP/{ext},30)' not in files['extensions.conf']
     assert files['pjsip.conf'].count('max_contacts=1') == 3
     assert 'Dial(PJSIP/101&PJSIP/102,45)' in files['extensions.conf']
-    assert 'exten => _1XX,1,Hangup(1)' in files['extensions.conf']
+    assert all(f'exten => {ext},1,Hangup(1)' in files['extensions.conf'] for ext in ('100','101','102'))
 
 
 def test_line_can_ring_one_selected_device():
@@ -98,3 +98,20 @@ def test_public_settings_redact_all_device_secrets(instance):
     assert public['devices'][0]['password_set'] is True
     assert 'password' not in public['devices'][0]
     assert all(d['password'] not in json.dumps(public) for d in settings.value['devices'])
+
+
+@pytest.mark.parametrize('extension',['0','6000','6299','06000','9'*79])
+def test_custom_numeric_extension_round_trips_and_is_not_sent_to_provider(extension):
+    cfg=config(devices=[device(extension)],phone_password='')
+    cfg=validate({'lines':[{**cfg['lines'][0],'incoming_devices':[extension]}]},cfg)
+    files=asterisk_files(cfg,'fake-ami-secret')
+    assert f'username={extension}\n' in files['pjsip.conf']
+    assert f'Dial(PJSIP/{extension},45)' in files['extensions.conf']
+    assert f'exten => {extension},1,Hangup(1)' in files['extensions.conf']
+    assert 'exten => 600,1,Answer()' in files['extensions.conf']
+    assert 'exten => _X.,1,Goto(from-out-main' in files['extensions.conf']
+
+
+@pytest.mark.parametrize('extension',['','9'*80,'6a00','6000@pbx','6000\n','600'])
+def test_malformed_or_service_extension_is_rejected(extension):
+    with pytest.raises(ValueError):config(devices=[device(extension)])

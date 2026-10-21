@@ -32,7 +32,7 @@ public final class NativeSipClient {
             this(server,port,"100",password,localPort);
         }
         public Config(String server, int port, String user, String password, int localPort) {
-            if(user==null||!user.matches("1[0-9]{2}"))throw new IllegalArgumentException("Enter an extension from 100 to 199.");
+            if(user==null||!user.matches("[0-9]{1,79}"))throw new IllegalArgumentException("Enter a numeric extension with 1 to 79 digits.");
             if (server == null || !server.matches("[a-zA-Z0-9.-]{1,253}") || server.startsWith("-") ||
                     port < 1 || port > 65535 || localPort < 1024 || localPort > 65535 ||
                     password == null || password.length() < 8 || password.length() > 256 ||

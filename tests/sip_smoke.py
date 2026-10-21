@@ -45,11 +45,11 @@ def main():
         'incoming_mode':'announcement', 'announcement_callers':['+4900011234567'],
         'announcement_auto_answer':True, 'announcement_max_seconds':30, 'announcement_pin':''})
     cfg['devices'] = [dict(extension=ext, name='Fake kiosk ' + ext,
-                           password='fake-device-secret-' + ext, enabled=True) for ext in ('101', '102')]
+                           password='fake-device-secret-' + ext, enabled=True) for ext in ('6000', '6299', '9'*79)]
     cfg['lines'][0]['incoming_devices'] = ['100']
     cfg['lines'].append({**cfg['lines'][0], 'id':'group', 'phone_number':'+4900001234570',
                         'client_user':'+4900001234570', 'contact_user':'+4900001234570',
-                        'from_user':'+4900001234570', 'incoming_devices':['101','102']})
+                        'from_user':'+4900001234570', 'incoming_devices':['6000','6299','9'*79]})
     # A local DNS server proves NAPTR/SRV resolution uses the configured
     # resolver, rather than relying on an A-record at a fixed SIP port.
     dns_queries=[]
@@ -248,8 +248,8 @@ def main():
             invite('+4900001234569',False,403,caller='+4900019999999')
             invite('+4900001234569',False,403,caller='anonymous')
             invite('+4900001234569',True,page=True)
-        # Two real PJSIP endpoint registrations coexist. An external incoming
-        # call forks to both; accepting one cancels the other without auto-answer.
+        # Real PJSIP registrations coexist, including the 79-digit maximum.
+        # An incoming call forks to all; answering one cancels the others.
         def recv_method(sock, method):
             deadline=time.monotonic()+6
             while time.monotonic()<deadline:
@@ -275,23 +275,28 @@ def main():
             if 'qop' in values:auth+=f', qop=auth, nc={nc}, cnonce="{cnonce}"'
             sock.sendto(request(2,auth+'\r\n').encode(),('127.0.0.1',15070));answer=sock.recv(16384).decode()
             assert answer.startswith('SIP/2.0 200'),answer
-        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as first, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as second:
-            for device_socket,extension in ((first,'101'),(second,'102')):
+        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as first, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as second, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as longest:
+            for device_socket,extension in ((first,'6000'),(second,'6299'),(longest,'9'*79)):
                 device_socket.bind(('127.0.0.1',0));device_socket.settimeout(6);register_device(device_socket,extension)
             contacts=subprocess.check_output(['asterisk','-C',astconf,'-rx','pjsip show contacts'],text=True)
-            assert all(ext+'/sip:'+ext+'@' in contacts for ext in ('100','101','102')),contacts
+            assert all(ext+'/sip:'+ext+'@' in contacts for ext in ('100','6000','6299')),contacts
             ident=uuid.uuid4().hex;destination='+4900001234570'
             sdp='v=0\r\no=fake 1 1 IN IP4 127.0.0.1\r\ns=Group test\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 41000 RTP/AVP 8\r\na=rtpmap:8 PCMA/8000\r\na=sendrecv\r\n'
             request=(f'INVITE sip:{destination}@127.0.0.1:15070 SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:15071;branch=z9hG4bK{ident};rport\r\nMax-Forwards: 70\r\nFrom: <sip:+4900011234567@127.0.0.1>;tag={ident}\r\nTo: <sip:{destination}@127.0.0.1>\r\nCall-ID: {ident}\r\nCSeq: 1 INVITE\r\nContact: <sip:fake@127.0.0.1:15071>\r\nContent-Type: application/sdp\r\nContent-Length: {len(sdp)}\r\n\r\n{sdp}')
             registrar.sendto(request.encode(),('127.0.0.1',15070))
-            invite_first=recv_method(first,'INVITE');invite_second=recv_method(second,'INVITE')
-            assert 'sip:101@' in invite_first.splitlines()[0] and 'sip:102@' in invite_second.splitlines()[0]
+            invite_first=recv_method(first,'INVITE');invite_second=recv_method(second,'INVITE');invite_long=recv_method(longest,'INVITE')
+            assert 'sip:'+('9'*79)+'@' in invite_long.splitlines()[0]
+            assert 'sip:6000@' in invite_first.splitlines()[0] and 'sip:6299@' in invite_second.splitlines()[0]
             assert 'answer-after=0' not in invite_first and 'answer-after=0' not in invite_second
-            second.sendto(response_to(invite_second,180,'Ringing','102',second).encode(),('127.0.0.1',15070))
-            first.sendto(response_to(invite_first,200,'OK','101',first,sdp.replace('41000','42002')).encode(),('127.0.0.1',15070))
+            second.sendto(response_to(invite_second,180,'Ringing','6299',second).encode(),('127.0.0.1',15070))
+            longest.sendto(response_to(invite_long,180,'Ringing','9'*79,longest).encode(),('127.0.0.1',15070))
+            first.sendto(response_to(invite_first,200,'OK','6000',first,sdp.replace('41000','42002')).encode(),('127.0.0.1',15070))
             cancel=recv_method(second,'CANCEL')
-            second.sendto(response_to(cancel,200,'OK','102',second).encode(),('127.0.0.1',15070))
-            second.sendto(response_to(invite_second,487,'Request Terminated','102',second).encode(),('127.0.0.1',15070))
+            second.sendto(response_to(cancel,200,'OK','6299',second).encode(),('127.0.0.1',15070))
+            second.sendto(response_to(invite_second,487,'Request Terminated','6299',second).encode(),('127.0.0.1',15070))
+            cancel_long=recv_method(longest,'CANCEL')
+            longest.sendto(response_to(cancel_long,200,'OK','9'*79,longest).encode(),('127.0.0.1',15070))
+            longest.sendto(response_to(invite_long,487,'Request Terminated','9'*79,longest).encode(),('127.0.0.1',15070))
             deadline=time.monotonic()+6;answer=''
             while time.monotonic()<deadline:
                 item=responses.get(timeout=6)
@@ -304,13 +309,13 @@ def main():
                 registrar.sendto(wire.encode(),('127.0.0.1',15070))
             provider_dialog('ACK',1);recv_method(first,'ACK')
             provider_dialog('BYE',2);bye=recv_method(first,'BYE')
-            first.sendto(response_to(bye,200,'OK','101',first).encode(),('127.0.0.1',15070))
+            first.sendto(response_to(bye,200,'OK','6000',first).encode(),('127.0.0.1',15070))
             for _ in range(30):
                 channels=subprocess.check_output(['asterisk','-C',astconf,'-rx','core show channels concise'],text=True)
-                if not any('PJSIP/'+ext+'-' in channels for ext in ('101','102')):break
+                if not any('PJSIP/'+ext+'-' in channels for ext in ('6000','6299')):break
                 time.sleep(.1)
-            assert not any('PJSIP/'+ext+'-' in channels for ext in ('101','102')),channels
-            print('PASS: independent 101/102 registrations, external ring group, explicit answer, losing kiosk CANCEL and clean hangup.')
+            assert not any('PJSIP/'+ext+'-' in channels for ext in ('6000','6299')),channels
+            print('PASS: independent 6000/6299/79-digit registrations, external ring group, explicit answer, losing kiosk CANCEL and clean hangup.')
         dialplan = subprocess.check_output(["asterisk", "-C", astconf, "-rx", "dialplan show 600@from-phone"], text=True)
         assert "Echo()" in dialplan, dialplan
         print("PASS: real Asterisk startup, authenticated local SIP REGISTER, password punctuation, local DNS SRV resolution, three fake provider registrations, isolated incoming routing, announcement allowlist, Auto-Answer headers and one-way RTP audio and echo dialplan. No external call made.")
