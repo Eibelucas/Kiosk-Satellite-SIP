@@ -7,7 +7,7 @@ import java.util.*;
 final class PhoneText {
     private static final Map<String,String> DE=new HashMap<>();
     static {
-        DE.put("Enter an extension from 100 to 199.","Nebenstelle von 100 bis 199 eingeben.");
+        DE.put("Enter a numeric extension with 1 to 79 digits.","Numerische Nebenstelle mit 1 bis 79 Ziffern eingeben.");
         DE.put("Check the PBX address, ports and device SIP password.","SIP-Adresse, Ports und Geräte-SIP-Passwort prüfen.");
         DE.put("Number: 3 to 20 digits, with optional +, * or #.","Nummer: 3 bis 20 Ziffern, optional +, * oder #.");
         DE.put("This device is not registered yet.","Das Gerät ist noch nicht angemeldet.");

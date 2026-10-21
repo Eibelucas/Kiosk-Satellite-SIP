@@ -39,7 +39,7 @@ public final class NativePhoneTest {
         void verifyDigest(SipMessage message,String method,String nonce){Map<String,String> p=SipDigest.parseParams(message.header("authorization"));check(p.get("username").equals(extension),"correct per-device digest user");String expected=SipDigest.response(extension,"asterisk","fake-phone-secret",method,p.get("uri"),nonce,p.get("qop"),p.get("nc"),p.get("cnonce"));check(expected.equals(p.get("response")),"correct digest response");}
     }
     public static void main(String[] args)throws Exception{
-        wakeWord();rtpPolicy();redirectedCall();languages();model();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices();
+        wakeWord();rtpPolicy();redirectedCall();languages();model();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices("101","102");independentDevices("6000","6299");independentDevices(repeat("9",79),"6299");extensionValidation();
         System.out.println("Native phone: "+assertions+" assertions passed (loopback SIP + model)");
     }
     static void model(){DialerModel m=new DialerModel();check(!m.canDial(),"unregistered cannot dial");m.registered=true;m.digit("1");m.digit("0");m.digit("1");check(m.canDial(),"registered number can dial");m.update("calling","101","Verbindet");m.expanded=false;check(m.active(),"collapse preserves call");m.digit("9");check(m.number.equals("101"),"cannot edit active number");m.update("connected","","Verbunden");long time=m.connectedAt;m.update("connected","","Verbunden");check(m.connectedAt==time,"duplicate event preserves duration");m.update("idle","","Beendet");check(m.canDial(),"call can be repeated");m.delete();check(!m.canDial(),"short invalid number rejected");}
@@ -95,9 +95,21 @@ public final class NativePhoneTest {
         check((AndroidG711.linearToA((short)1000)&255)==0xfa,"A-law positive reference vector");check((AndroidG711.linearToA((short)-1000)&255)==0x7a,"A-law negative reference vector");check((AndroidG711.linearToA((short)0)&255)==0xd5,"A-law silence reference vector");
         DialerModel m=new DialerModel();m.plus();m.digit("4");m.digit("9");m.digit("1");check(m.number.equals("+491"),"native plus prefix");
     }
-    static void independentDevices()throws Exception{try(Fixture first=new Fixture("101");Fixture second=new Fixture("102")){
-        check(first.sip.registered()&&second.sip.registered(),"two device clients registered simultaneously");first.sip.dial("102");SipMessage a=first.receive("INVITE");second.sip.dial("101");SipMessage b=second.receive("INVITE");check(a.header("from").contains("sip:101@"),"first device uses own identity");check(b.header("from").contains("sip:102@"),"second device uses own identity");check(a.header("contact").contains("sip:101@"),"first contact separated");check(b.header("contact").contains("sip:102@"),"second contact separated");check(!a.header("call-id").equals(b.header("call-id")),"devices have isolated dialogs");first.send(first.response(a,486,"Busy Here","",""));second.send(second.response(b,486,"Busy Here","",""));first.receive("ACK");second.receive("ACK");
+    static void independentDevices(String firstExtension,String secondExtension)throws Exception{try(Fixture first=new Fixture(firstExtension);Fixture second=new Fixture(secondExtension)){
+        check(first.sip.registered()&&second.sip.registered(),"two device clients registered simultaneously");first.sip.dial("004930123456");SipMessage a=first.receive("INVITE");second.sip.dial("004930123457");SipMessage b=second.receive("INVITE");check(a.header("from").contains("sip:"+firstExtension+"@"),"first device uses own identity");check(b.header("from").contains("sip:"+secondExtension+"@"),"second device uses own identity");check(a.header("contact").contains("sip:"+firstExtension+"@"),"first contact separated");check(b.header("contact").contains("sip:"+secondExtension+"@"),"second contact separated");check(!a.header("call-id").equals(b.header("call-id")),"devices have isolated dialogs");first.send(first.response(a,486,"Busy Here","",""));second.send(second.response(b,486,"Busy Here","",""));first.receive("ACK");second.receive("ACK");
     }}
+
+    static String repeat(String value,int count){StringBuilder result=new StringBuilder();for(int i=0;i<count;i++)result.append(value);return result.toString();}
+    static void extensionValidation(){
+        for(String user:new String[]{"0","100","6000","6299","06000",repeat("9",79)}){
+            NativeSipClient.Config cfg=new NativeSipClient.Config("127.0.0.1",5070,user,"fake-phone-secret",5090);
+            check(cfg.user.equals(user),"numeric extension preserved: "+user);
+        }
+        for(String user:new String[]{"",repeat("9",80),"6a00","6000\r\nX-Test: bad"," 6000","6000@pbx"}){
+            boolean rejected=false;try{new NativeSipClient.Config("127.0.0.1",5070,user,"fake-phone-secret",5090);}catch(IllegalArgumentException expected){rejected=true;}
+            check(rejected,"malformed extension rejected");
+        }
+    }
 
     static final class WakeBridge implements WakeWordGuard.Bridge {
         static final class Pending {

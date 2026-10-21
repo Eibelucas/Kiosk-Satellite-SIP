@@ -263,3 +263,32 @@ def test_existing_contact_card_types_survive_migration_and_editing(tmp_path):
     store.save(request,0);settings.save(store.compile())
     assert settings.value["contacts"][0]["kind"]=="kiosk"
     assert settings.value["contacts"][0]["favorite"] is True
+
+
+def test_custom_extensions_save_route_and_retain_secrets(tmp_path):
+    store=WorkspaceStore(tmp_path)
+    value=configured();value['devices'][0]['extension']='6000';value['numbers'][0]['incoming_devices']=['6000']
+    store.save(value,0)
+    request=public_request(store);request['devices'][0]['name']='Renamed kiosk'
+    store.save(request,1)
+    settings=Settings(tmp_path);settings.save(store.compile())
+    assert settings.value['devices'][0]['extension']=='6000'
+    assert settings.value['devices'][0]['password']=='fake-device-secret-123'
+    assert settings.value['lines'][0]['incoming_devices']==['6000']
+    files=asterisk_files(settings.value,'fake-ami-secret')
+    assert 'Dial(PJSIP/6000,45)' in files['extensions.conf']
+    assert 'exten => 6000,1,Hangup(1)' in files['extensions.conf']
+
+
+def test_maximum_extension_survives_migration_and_editing(tmp_path):
+    from workspace import migrate_legacy
+    source=WorkspaceStore(tmp_path/'source');value=configured()
+    extension='9'*79
+    value['devices'][0]['extension']=extension;value['numbers'][0]['incoming_devices']=[extension]
+    source.save(value,0)
+    settings=Settings(tmp_path/'gateway');settings.save(source.compile())
+    migrated=migrate_legacy(settings.value)
+    assert validate_draft(migrated,migrated)['devices'][0]['extension']==extension
+    store=WorkspaceStore(settings.directory,settings.value)
+    store.save(public_request(store),0)
+    assert store.compile()['devices'][0]['extension']==extension

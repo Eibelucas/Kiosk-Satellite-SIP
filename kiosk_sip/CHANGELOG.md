@@ -1,3 +1,10 @@
+# 26.10.18
+
+- Support numeric SIP device extensions with 1–79 digits, including 6000–6299, in the plugin and gateway.
+- Accept custom extensions in device editors and ring targets while retaining extension 100 compatibility and echo service 600.
+- Prevent configured local device identities from falling through to the external provider dial plan.
+- Verify simultaneous 6000/6299 SIP registration, ring-group cancellation, password retention and editor persistence.
+
 # 26.10.17
 
 - Add separate administration pages for SIP accounts, numbers, kiosks, contacts, network and diagnostics.

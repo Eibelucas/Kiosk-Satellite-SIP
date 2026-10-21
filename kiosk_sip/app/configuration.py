@@ -1,4 +1,5 @@
 """Validated local configuration. No customer credentials belong in Git."""
+import hashlib
 import ipaddress
 import json
 import os
@@ -52,17 +53,23 @@ ANNOUNCEMENT_DEFAULTS = {"announcement_callers": [], "announcement_pin": "", "an
 LINE_FIELDS = ACCOUNT_FIELDS | {"id", "label", "incoming_mode", "incoming_devices"} | set(ANNOUNCEMENT_DEFAULTS) | {"announcement_clear_pin"}
 
 
+# Asterisk AST_MAX_EXTENSION is 80 bytes, including the terminating NUL.
+# Keep the same numeric identity intact across registration and dialplan matching.
+def valid_extension(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9]{1,79}", value) is not None and value != "600"
+
+
 def validate_devices(raw_devices, previous=()):
     if not isinstance(raw_devices, list) or len(raw_devices) > 99:
-        raise ValueError("Höchstens 99 Geräte mit Nebenstellen 101 bis 199 einrichten.")
+        raise ValueError("Höchstens 99 zusätzliche Geräte einrichten.")
     old = {d["extension"]: d for d in previous}
     devices, extensions = [], set()
     for raw in raw_devices:
         if not isinstance(raw, dict) or set(raw) - {"extension", "name", "password", "enabled"}:
             raise ValueError("Ungültiger Geräteeintrag.")
         extension = raw.get("extension")
-        if not isinstance(extension, str) or not re.fullmatch(r"1[0-9]{2}", extension) or extension == "100":
-            raise ValueError("Jedes Gerät benötigt eine Nebenstelle von 101 bis 199. 100 bleibt reserviert.")
+        if not valid_extension(extension) or extension == "100":
+            raise ValueError("Nebenstelle: 1 bis 79 Ziffern. 100 bleibt für bestehende Geräte und 600 für den Echo-Test reserviert.")
         if extension in extensions:
             raise ValueError("Jede Geräte-Nebenstelle darf nur einmal vorkommen.")
         name = raw.get("name", "")
@@ -178,8 +185,8 @@ def validate_line(raw, previous=None):
         raise ValueError("Durchsage: Auto-Answer-Schalter und Dauer zwischen 10 und 600 Sekunden prüfen.")
     validate_account(cfg)
     targets = cfg["incoming_devices"]
-    if not isinstance(targets, list) or len(targets) > 100 or any(not isinstance(x, str) or not re.fullmatch(r"1[0-9]{2}", x) for x in targets) or len(set(targets)) != len(targets):
-        raise ValueError("Klingelziele müssen eindeutige Geräte-Nebenstellen von 100 bis 199 sein.")
+    if not isinstance(targets, list) or len(targets) > 100 or any(not valid_extension(x) for x in targets) or len(set(targets)) != len(targets):
+        raise ValueError("Klingelziele müssen eindeutige numerische Geräte-Nebenstellen sein; 600 ist für den Echo-Test reserviert.")
     return cfg
 
 
@@ -382,6 +389,8 @@ local_net=127.0.0.1/32
             continue
         extension = device["extension"]
         auth_id = "phone-auth" if extension == "100" else "device-" + extension + "-auth"
+        if len(auth_id) > 79:
+            auth_id = "device-" + hashlib.sha256(extension.encode("ascii")).hexdigest() + "-auth"
         pjsip += f"""
 [{extension}]
 type=endpoint
@@ -471,7 +480,8 @@ include => from-kiosk-phone
 """
     # Device extensions are identities; KS already provides internal intercom.
     # Never send a local device number to the external provider.
-    dial += "exten => _1XX,1,Hangup(1)\n"
+    for extension in sorted({"100"} | {d["extension"] for d in cfg.get("devices", [])}):
+        dial += f"exten => {extension},1,Hangup(1)\n"
     selected = next((line for line in lines if line["id"] == cfg.get("outbound_line", "main") and line["incoming_mode"] == "normal"), None)
     if selected:
         for pattern in ("_X.", "_+X.", "_*X.", "_#X."):

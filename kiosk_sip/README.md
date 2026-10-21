@@ -17,7 +17,7 @@ Saving an editor stores a draft. **Apply changes** explicitly updates the runnin
 
 ## Existing installations
 
-The first start of version 26.10.17 migrates existing gateway settings into the workspace. Provider passwords, the web login hash, device passwords, phone numbers, call rules and configured ports are preserved. Migration does not rewrite the active runtime configuration. Extension 100 remains available for existing clients and appears in the device list; additional devices use extensions 101–199.
+The first start of version 26.10.17 migrates existing gateway settings into the workspace. Provider passwords, the web login hash, device passwords, phone numbers, call rules and configured ports are preserved. Migration does not rewrite the active runtime configuration. Extension 100 remains available for existing clients and appears in the device list; additional devices can use numeric extensions with 1–79 digits, such as 6000–6299. Extension 100 remains reserved for compatibility, and 600 for the local echo test.
 
 Install the update on the existing app to retain its data. A separately installed UI Lab has its own data directory and does not automatically import gateway credentials.
 

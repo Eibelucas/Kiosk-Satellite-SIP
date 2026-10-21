@@ -17,7 +17,7 @@ Call state is independent of whether the overlay is expanded. Cancellation, remo
 
 ## SIP devices and phone numbers
 
-Asterisk maintains separate authentication and registration for each enabled SIP device. Extension 100 supports one device; extensions 101–199 are available for additional devices. A new registration for an extension replaces its previous registration.
+Asterisk maintains separate authentication and registration for each enabled SIP device. Extension 100 supports one device; additional devices use unique numeric extensions with 1–79 digits. The bundled gateway reserves extension 600 for the echo test. A new registration for an extension replaces its previous registration.
 
 External phone numbers can ring individual devices or a group. When one device answers, Asterisk sends CANCEL to the remaining targets. Internal device calls are handled by KS intercom rather than the SIP dialer.
 
