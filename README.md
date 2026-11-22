@@ -80,6 +80,10 @@ The **Dial a number** command opens the dialer and calls the number it is given.
 - A dashboard button on the kiosk: set its tap action to the link `ks://plugin/kiosk-satellite-sip/dial/NUMBER`, for example `ks://plugin/kiosk-satellite-sip/dial/**611`. Spaces, dashes, dots, slashes and brackets in the number are ignored. Needs Kiosk Satellite 2026.11.16 or later.
 - An automation: the remote admin API command `runPluginCommand` with `{"id": "kiosk-satellite-sip", "command": "dial", "args": ["NUMBER"]}`.
 
+### Answering from Home Assistant
+
+The **Answer call** command answers a ringing call; **Hang up call** ends a call or declines a ringing one. Both show up as buttons in Home Assistant.
+
 ### Home Assistant sensors
 
 With ESPHome native entities enabled in Kiosk Satellite, the plugin publishes two text sensors:

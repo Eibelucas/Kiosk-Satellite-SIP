@@ -102,6 +102,10 @@
       "title": "Hang up call"
     },
     {
+      "id": "answer",
+      "title": "Answer call"
+    },
+    {
       "id": "dial",
       "title": "Dial a number"
     }

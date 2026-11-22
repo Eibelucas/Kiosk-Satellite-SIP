@@ -123,6 +123,7 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
         if(command.equals("toggleDialer"))toggle();
         else if(command.equals("openPhone")){model.expanded=true;refresh();}
         else if(command.equals("hangup"))hangup();
+        else if(command.equals("answer")){model.expanded=true;answer();refresh();}
         else if(command.equals("dial"))dialCommand(args);
     });}
     /**
