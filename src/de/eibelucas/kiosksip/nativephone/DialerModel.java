@@ -21,6 +21,8 @@ public final class DialerModel {
         state=next;detail=message;
         if(next.equals("idle")||next.equals("error")){muted=false;connectedAt=0;}
     }
+    /** How long the dialer stays open after a call ends: 3 s, or 10 s when it ended with an error. */
+    public static long collapseDelay(String endState){return "error".equals(endState)?10_000:3_000;}
     public String label(){
         if(!state.equals("connected"))return detail;
         long seconds=Math.max(0,(System.nanoTime()-connectedAt)/1_000_000_000);

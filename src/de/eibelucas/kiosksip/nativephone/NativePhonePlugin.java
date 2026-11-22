@@ -18,6 +18,11 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
     private WakeWordGuard wake;
     private boolean intercomBusy,voiceBusy,preparing;
     private long intercomEvent,voiceEvent;
+    /** Last values sent to Home Assistant, so a refresh every second does not republish unchanged states. */
+    private String publishedState,publishedPeer;
+    /** Whether the last refresh saw a call (or call setup), and a token that cancels a pending auto-collapse. */
+    private boolean wasActive;
+    private int collapseToken;
     private final Runnable tick=new Runnable(){public void run(){
         if(host==null)return;
         if(view!=null)view.refresh();
@@ -68,7 +73,7 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
             if(wake!=null)wake.release();preparing=false;text=language;
             model.registered=false;model.mutedLabel=text.get("Microphone muted");
             model.update("idle","",text.get("Set up SIP: PBX address, extension and device password."));
-            view=new FloatingDialer(model,this,text);
+            view=new FloatingDialer(model,this,text);view.setBottomInset(bottom);view.setLeft(side.equals(OverlaySpec.BOTTOM_LEFT));
             try{host.showOverlay("native_phone",OverlaySpec.at(side).inset(12,12,12,bottom).onTop(true).closeOnBack(false),view);}
             catch(Exception e){host.status(text.get("Native overlays unavailable. Update Kiosk Satellite."),true);}
         });
@@ -118,7 +123,33 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
         if(command.equals("toggleDialer"))toggle();
         else if(command.equals("openPhone")){model.expanded=true;refresh();}
         else if(command.equals("hangup"))hangup();
+        else if(command.equals("answer")){model.expanded=true;answer();refresh();}
+        else if(command.equals("dial"))dialCommand(args);
     });}
+    /**
+     * {@code ks://plugin/kiosk-satellite-sip/dial/NUMBER} from a dashboard button, or the remote API's runPluginCommand
+     * with {@code args: [NUMBER]}: opens the dialer and calls NUMBER. Without a number (ESPHome button, gesture, drawer)
+     * it only opens the dialer. Spaces, dashes, dots, slashes and brackets are dropped, so "0151 234-567" works.
+     */
+    private void dialCommand(Map<String,Object> args){
+        model.expanded=true;
+        String wanted=dialArgument(args);
+        if(wanted==null){refresh();return;}
+        if(model.active()||preparing){model.detail=text.get("Already in a call.");refresh();return;}
+        if(!wanted.matches("\\+?[0-9*#]{3,20}")){model.update("error","",text.get("Number: 3 to 20 digits, with optional +, * or #."));refresh();return;}
+        model.number=wanted;refresh();
+        if(!model.registered){model.detail=text.get("SIP not registered");refresh();return;}
+        dial(wanted);
+    }
+    /** The first link or API argument with separators removed, or null when there is none. */
+    static String dialArgument(Map<String,Object> args){
+        Object list=args==null?null:args.get("args");
+        if(!(list instanceof List)||((List<?>)list).isEmpty())return null;
+        Object first=((List<?>)list).get(0);
+        if(first==null)return null;
+        String cleaned=String.valueOf(first).trim().replaceAll("[\\s\\-./()]","");
+        return cleaned.isEmpty()?null:cleaned;
+    }
     public void toggle(){if(host==null)return;model.expanded=!model.expanded;refresh();}
     private boolean audioAllowed(){
         if(intercomBusy||voiceBusy){model.detail=text.get("Audio is busy with Voice Satellite or intercom.");refresh();return false;}
@@ -163,11 +194,36 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
     }
     public void mute(){model.muted=!model.muted;NativeSipClient c=client;if(c!=null)c.mute(model.muted);refresh();}
     private void refresh(){
+        boolean active=model.active()||preparing;
+        if(wasActive&&!active)collapseLater();
+        if(active)collapseToken++;
+        wasActive=active;
         if(view!=null)view.refresh();PluginHost h=host;
         if(h!=null)try{h.status(model.label(),model.state.equals("error")||!model.registered&&!model.active());}catch(Exception ignored){}
+        publishCall(h);
+    }
+    /**
+     * After a call ends, hide the dialer and clear the number so a wall panel goes back to its dashboard.
+     * Skipped when a new call starts or the user types in the meantime; a failed call stays visible longer.
+     */
+    private void collapseLater(){
+        final int token=++collapseToken;final String number=model.number;
+        main.postDelayed(()->{
+            if(token!=collapseToken||host==null||model.active()||preparing||!model.number.equals(number))return;
+            model.expanded=false;model.number="";refresh();
+        },DialerModel.collapseDelay(model.state));
+    }
+    /** Home Assistant text sensors "Call state" (idle, preparing, calling, ringing, incoming, connected, cancelling, error) and "Call peer". */
+    private void publishCall(PluginHost h){
+        if(h==null)return;
+        String state=model.state,peer=model.active()?model.peer:"";
+        try{
+            if(!state.equals(publishedState)){h.publishTextSensor("call_state","Call state",state);publishedState=state;}
+            if(!peer.equals(publishedPeer)){h.publishTextSensor("call_peer","Call peer",peer.isEmpty()?null:peer);publishedPeer=peer;}
+        }catch(Exception|LinkageError unsupported){publishedState=state;publishedPeer=peer;} // older KS without entities
     }
     public void stop(){
-        host=null;generation++;main.removeCallbacksAndMessages(null);
+        host=null;publishedState=null;publishedPeer=null;generation++;main.removeCallbacksAndMessages(null);
         main.post(()->{if(wake!=null)wake.abandon();preparing=false;});
         NativeSipClient old=client;client=null;if(old!=null)old.stop();
     }

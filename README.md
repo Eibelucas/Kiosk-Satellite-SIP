@@ -67,9 +67,33 @@ The status **Ready · Extension …** confirms registration. Dial **600 in the n
 
 ## Usage
 
-Tap the phone button, enter a number, and select **Call**. The call view shows the destination, status, and duration. **Mute** mutes the microphone; **Hang up** ends the call. Collapsing the panel keeps the call active. Hold **0** to insert a plus sign at the start of a number.
+Tap the phone button, enter a number, and select **Call**. The call view shows the destination, status, and duration. **Mute** mutes the microphone; **Hang up** ends the call. Collapsing the panel keeps the call active. When a call ends, the dialer hides itself after 3 seconds and clears the number. Hold **0** to insert a plus sign at the start of a number.
 
 Incoming calls have **Answer** and **Decline** controls. Internal calls between kiosks remain available through Kiosk Satellite intercom.
+
+On screens under 600 dp high, such as a 480 × 480 wall panel, the dialer uses a compact layout: the status replaces the title, the keys are smaller, and **Call** sits beside the number, so the whole keypad fits without scrolling.
+
+### Dialing from a dashboard or Home Assistant
+
+The **Dial a number** command opens the dialer and calls the number it is given. Without a number, it only opens the dialer.
+
+- A dashboard button on the kiosk: set its tap action to the link `ks://plugin/kiosk-satellite-sip/dial/NUMBER`, for example `ks://plugin/kiosk-satellite-sip/dial/**611`. Spaces, dashes, dots, slashes and brackets in the number are ignored. Needs Kiosk Satellite 2026.11.16 or later.
+- An automation: the remote admin API command `runPluginCommand` with `{"id": "kiosk-satellite-sip", "command": "dial", "args": ["NUMBER"]}`.
+
+### Answering from Home Assistant
+
+The **Answer call** command answers a ringing call; **Hang up call** ends a call or declines a ringing one. Both show up as buttons in Home Assistant.
+
+### Home Assistant sensors
+
+With ESPHome native entities enabled in Kiosk Satellite, the plugin publishes two text sensors:
+
+| Sensor | Values |
+| --- | --- |
+| Call state | `idle`, `preparing`, `calling`, `ringing`, `incoming`, `connected`, `cancelling` or `error` |
+| Call peer | The number on the active call; empty when idle |
+
+They can, for example, pause music on the kiosk during a call.
 
 ## Settings and data flow
 

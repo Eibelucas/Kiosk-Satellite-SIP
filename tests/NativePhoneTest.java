@@ -39,8 +39,23 @@ public final class NativePhoneTest {
         void verifyDigest(SipMessage message,String method,String nonce){Map<String,String> p=SipDigest.parseParams(message.header("authorization"));check(p.get("username").equals(extension),"correct per-device digest user");String expected=SipDigest.response(extension,"asterisk","fake-phone-secret",method,p.get("uri"),nonce,p.get("qop"),p.get("nc"),p.get("cnonce"));check(expected.equals(p.get("response")),"correct digest response");}
     }
     public static void main(String[] args)throws Exception{
-        wakeWord();rtpPolicy();redirectedCall();languages();model();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices("101","102");independentDevices("6000","6299");independentDevices(repeat("9",79),"6299");extensionValidation();
+        wakeWord();rtpPolicy();redirectedCall();languages();model();forkAdditions();playoutQueue();directCall();cancel();cancelAnswerRace();rejection();incoming();stopActive();spoofedResponse();retransmission();lateAnswerAfterCancel();incomingDeclineRetransmission();mediaFailure();codecs();independentDevices("101","102");independentDevices("6000","6299");independentDevices(repeat("9",79),"6299");extensionValidation();
         System.out.println("Native phone: "+assertions+" assertions passed (loopback SIP + model)");
+    }
+    static void forkAdditions(){
+        java.util.Map<String,Object> a=new java.util.HashMap<>();
+        check(NativePhonePlugin.dialArgument(a)==null,"no args: only open");
+        a.put("args",java.util.Collections.emptyList());check(NativePhonePlugin.dialArgument(a)==null,"empty args: only open");
+        a.put("args",java.util.Arrays.asList(" 0151 234-56/7 (8) "));check("015123456 78".replace(" ","").equals(NativePhonePlugin.dialArgument(a)),"separators dropped");
+        a.put("args",java.util.Arrays.asList("+49.6053"));check("+496053".equals(NativePhonePlugin.dialArgument(a)),"plus kept");
+        a.put("args",java.util.Arrays.asList("**611"));check("**611".equals(NativePhonePlugin.dialArgument(a)),"internal number kept");
+        check(FloatingDialer.isCompact(480,1f),"480 px panel at mdpi is compact");
+        check(!FloatingDialer.isCompact(800,1f),"800 px tablet is not compact");
+        check(!FloatingDialer.isCompact(1200,1.5f),"tall hdpi tablet is not compact");
+        check(FloatingDialer.panelLimit(480,1f,88)==480-164,"limit leaves room for insets and the phone button");
+        check(FloatingDialer.panelLimit(300,1f,300)==100,"limit never below 100 dp");
+        check(DialerModel.collapseDelay("idle")==3000,"dialer hides 3 s after a call");
+        check(DialerModel.collapseDelay("error")==10000,"failed call stays visible longer");
     }
     static void model(){DialerModel m=new DialerModel();check(!m.canDial(),"unregistered cannot dial");m.registered=true;m.digit("1");m.digit("0");m.digit("1");check(m.canDial(),"registered number can dial");m.update("calling","101","Verbindet");m.expanded=false;check(m.active(),"collapse preserves call");m.digit("9");check(m.number.equals("101"),"cannot edit active number");m.update("connected","","Verbunden");long time=m.connectedAt;m.update("connected","","Verbunden");check(m.connectedAt==time,"duplicate event preserves duration");m.update("idle","","Beendet");check(m.canDial(),"call can be repeated");m.delete();check(!m.canDial(),"short invalid number rejected");}
     static void playoutQueue()throws Exception{
