@@ -20,6 +20,9 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
     private long intercomEvent,voiceEvent;
     /** Last values sent to Home Assistant, so a refresh every second does not republish unchanged states. */
     private String publishedState,publishedPeer;
+    /** Whether the last refresh saw a call (or call setup), and a token that cancels a pending auto-collapse. */
+    private boolean wasActive;
+    private int collapseToken;
     private final Runnable tick=new Runnable(){public void run(){
         if(host==null)return;
         if(view!=null)view.refresh();
@@ -190,9 +193,24 @@ public final class NativePhonePlugin implements KioskPlugin,FloatingDialer.Actio
     }
     public void mute(){model.muted=!model.muted;NativeSipClient c=client;if(c!=null)c.mute(model.muted);refresh();}
     private void refresh(){
+        boolean active=model.active()||preparing;
+        if(wasActive&&!active)collapseLater();
+        if(active)collapseToken++;
+        wasActive=active;
         if(view!=null)view.refresh();PluginHost h=host;
         if(h!=null)try{h.status(model.label(),model.state.equals("error")||!model.registered&&!model.active());}catch(Exception ignored){}
         publishCall(h);
+    }
+    /**
+     * After a call ends, hide the dialer and clear the number so a wall panel goes back to its dashboard.
+     * Skipped when a new call starts or the user types in the meantime; a failed call stays visible longer.
+     */
+    private void collapseLater(){
+        final int token=++collapseToken;final String number=model.number;
+        main.postDelayed(()->{
+            if(token!=collapseToken||host==null||model.active()||preparing||!model.number.equals(number))return;
+            model.expanded=false;model.number="";refresh();
+        },DialerModel.collapseDelay(model.state));
     }
     /** Home Assistant text sensors "Call state" (idle, preparing, calling, ringing, incoming, connected, cancelling, error) and "Call peer". */
     private void publishCall(PluginHost h){

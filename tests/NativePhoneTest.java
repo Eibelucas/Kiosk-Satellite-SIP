@@ -54,6 +54,8 @@ public final class NativePhoneTest {
         check(!FloatingDialer.isCompact(1200,1.5f),"tall hdpi tablet is not compact");
         check(FloatingDialer.panelLimit(480,1f,88)==480-164,"limit leaves room for insets and the phone button");
         check(FloatingDialer.panelLimit(300,1f,300)==100,"limit never below 100 dp");
+        check(DialerModel.collapseDelay("idle")==3000,"dialer hides 3 s after a call");
+        check(DialerModel.collapseDelay("error")==10000,"failed call stays visible longer");
     }
     static void model(){DialerModel m=new DialerModel();check(!m.canDial(),"unregistered cannot dial");m.registered=true;m.digit("1");m.digit("0");m.digit("1");check(m.canDial(),"registered number can dial");m.update("calling","101","Verbindet");m.expanded=false;check(m.active(),"collapse preserves call");m.digit("9");check(m.number.equals("101"),"cannot edit active number");m.update("connected","","Verbunden");long time=m.connectedAt;m.update("connected","","Verbunden");check(m.connectedAt==time,"duplicate event preserves duration");m.update("idle","","Beendet");check(m.canDial(),"call can be repeated");m.delete();check(!m.canDial(),"short invalid number rejected");}
     static void playoutQueue()throws Exception{

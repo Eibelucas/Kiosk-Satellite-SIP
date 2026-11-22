@@ -67,7 +67,7 @@ The status **Ready · Extension …** confirms registration. Dial **600 in the n
 
 ## Usage
 
-Tap the phone button, enter a number, and select **Call**. The call view shows the destination, status, and duration. **Mute** mutes the microphone; **Hang up** ends the call. Collapsing the panel keeps the call active. Hold **0** to insert a plus sign at the start of a number.
+Tap the phone button, enter a number, and select **Call**. The call view shows the destination, status, and duration. **Mute** mutes the microphone; **Hang up** ends the call. Collapsing the panel keeps the call active. When a call ends, the dialer hides itself after 3 seconds and clears the number. Hold **0** to insert a plus sign at the start of a number.
 
 Incoming calls have **Answer** and **Decline** controls. Internal calls between kiosks remain available through Kiosk Satellite intercom.
 
