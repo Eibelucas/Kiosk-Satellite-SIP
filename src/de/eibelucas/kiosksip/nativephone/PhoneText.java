@@ -10,6 +10,7 @@ final class PhoneText {
         DE.put("Enter a numeric extension with 1 to 79 digits.","Numerische Nebenstelle mit 1 bis 79 Ziffern eingeben.");
         DE.put("Check the PBX address, ports and device SIP password.","SIP-Adresse, Ports und Geräte-SIP-Passwort prüfen.");
         DE.put("Number: 3 to 20 digits, with optional +, * or #.","Nummer: 3 bis 20 Ziffern, optional +, * oder #.");
+        DE.put("Already in a call.","Es läuft bereits ein Gespräch.");
         DE.put("This device is not registered yet.","Das Gerät ist noch nicht angemeldet.");
         DE.put("Only IPv4 is supported.","Nur IPv4 wird unterstützt.");
         DE.put("Could not process the call.","Anruf konnte nicht verarbeitet werden.");

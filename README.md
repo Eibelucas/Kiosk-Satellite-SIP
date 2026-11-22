@@ -71,6 +71,26 @@ Tap the phone button, enter a number, and select **Call**. The call view shows t
 
 Incoming calls have **Answer** and **Decline** controls. Internal calls between kiosks remain available through Kiosk Satellite intercom.
 
+On screens under 600 dp high, such as a 480 × 480 wall panel, the dialer uses a compact layout: the status replaces the title, the keys are smaller, and **Call** sits beside the number, so the whole keypad fits without scrolling.
+
+### Dialing from a dashboard or Home Assistant
+
+The **Dial a number** command opens the dialer and calls the number it is given. Without a number, it only opens the dialer.
+
+- A dashboard button on the kiosk: set its tap action to the link `ks://plugin/kiosk-satellite-sip/dial/NUMBER`, for example `ks://plugin/kiosk-satellite-sip/dial/**611`. Spaces, dashes, dots, slashes and brackets in the number are ignored. Needs Kiosk Satellite 2026.11.16 or later.
+- An automation: the remote admin API command `runPluginCommand` with `{"id": "kiosk-satellite-sip", "command": "dial", "args": ["NUMBER"]}`.
+
+### Home Assistant sensors
+
+With ESPHome native entities enabled in Kiosk Satellite, the plugin publishes two text sensors:
+
+| Sensor | Values |
+| --- | --- |
+| Call state | `idle`, `preparing`, `calling`, `ringing`, `incoming`, `connected`, `cancelling` or `error` |
+| Call peer | The number on the active call; empty when idle |
+
+They can, for example, pause music on the kiosk during a call.
+
 ## Settings and data flow
 
 The phone button has settings for screen side, bottom offset, and local SIP port. The plugin uses native overlays, host state and control APIs, and Android microphone/audio access. Host state checks detect active Voice Satellite turns and intercom sessions. Before a user places or answers a call, the plugin reads the wake word mute state, mutes wake word when needed, and waits for listening to stop. It restores the previous mute state after the call ends, is cancelled, or fails. Incoming ringing alone does not mute wake word.

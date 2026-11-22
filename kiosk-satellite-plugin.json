@@ -4,6 +4,7 @@
   "id": "kiosk-satellite-sip",
   "name": "SIP Phone for Kiosk Satellite",
   "version": "26.10.18",
+  "minAppVersion": "2026.11.16",
   "minAndroidSdk": 24,
   "entryClass": "de.eibelucas.kiosksip.nativephone.NativePhonePlugin",
   "description": "Native SIP calling with a floating dialer, direct calls through a configured PBX, and a separate extension for each kiosk.",
@@ -12,7 +13,8 @@
   "capabilities": [
     "overlay",
     "host.read",
-    "host.control"
+    "host.control",
+    "entities"
   ],
   "settings": [
     {
@@ -98,6 +100,10 @@
     {
       "id": "hangup",
       "title": "Hang up call"
+    },
+    {
+      "id": "dial",
+      "title": "Dial a number"
     }
   ],
   "icon": "icon.png"
